@@ -153,7 +153,7 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {[
               {
                 role: "Parents",
@@ -166,12 +166,6 @@ export default function Home() {
                 description: "Access optimized routes, manage student attendance, and receive real-time updates.",
                 icon: "🚌",
                 link: "/driver/login"
-              },
-              {
-                role: "Administrators",
-                description: "Oversee the entire fleet, analyze data, and make informed decisions.",
-                icon: "👩‍💼",
-                link: "/admin/login"
               }
             ].map((role, index) => (
               <motion.div

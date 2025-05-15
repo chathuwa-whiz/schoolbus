@@ -168,13 +168,9 @@ export default function Login() {
 
                 <div className="mt-8 text-center">
                   <p className="text-sm text-gray-500 mb-4">Or sign in as</p>
-                  <div className="flex justify-center space-x-4">
+                  <div className="flex justify-center">
                     <Link to="/driver/login" className="text-gray-600 hover:text-indigo-600 transition-colors">
                       Driver
-                    </Link>
-                    <span className="text-gray-300">|</span>
-                    <Link to="/admin/login" className="text-gray-600 hover:text-indigo-600 transition-colors">
-                      Administrator
                     </Link>
                   </div>
                 </div>
