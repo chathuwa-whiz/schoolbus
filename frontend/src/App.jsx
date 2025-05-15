@@ -5,8 +5,11 @@ import Home from './home/Home'
 import ParentRegister from './parent/Register'
 import ParentLogin from './parent/Login'
 import ParentDashboardLayout from './parent/DashboardLayout'
+import DriverRegister from './driver/Register'
+import DriverLogin from './driver/Login'
+import DriverDashboardLayout from './driver/DashboardLayout'
 
-// Dashboard components
+// Parent components
 import Overview from './parent/components/Overview'
 import Children from './parent/components/Children'
 import Tracking from './parent/components/Tracking'
@@ -14,6 +17,15 @@ import AttendanceHistory from './parent/components/AttendanceHistory'
 import Payments from './parent/components/Payment'
 import Notifications from './parent/components/Notifications'
 import Settings from './parent/components/Settings'
+
+// Driver components
+import DriverOverview from './driver/components/Overview'
+import DriverRoutes from './driver/components/Routes'
+import DriverAttendance from './driver/components/Attendance'
+import DriverTracking from './driver/components/Tracking'
+import DriverPayments from './driver/components/Payments'
+import DriverReports from './driver/components/Reports'
+import DriverSettings from './driver/components/Settings'
 
 export default function App() {
   return (
@@ -23,10 +35,12 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/parent/register" element={<ParentRegister />} />
         <Route path="/parent/login" element={<ParentLogin />} />
+        <Route path="/driver/register" element={<DriverRegister />} />
+        <Route path="/driver/login" element={<DriverLogin />} />
         
         {/* Protected parent routes */}
         <Route path="/parent" element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="parent">
             <ParentDashboardLayout />
           </ProtectedRoute>
         }>
@@ -38,7 +52,21 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
         </Route>
-        
+
+        {/* Protected driver routes */}
+        <Route path="/driver" element={
+          <ProtectedRoute requiredRole="driver">
+            <DriverDashboardLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<DriverOverview />} />
+          <Route path="routes" element={<DriverRoutes />} />
+          <Route path="attendance" element={<DriverAttendance />} />
+          <Route path="tracking" element={<DriverTracking />} />
+          <Route path="payments" element={<DriverPayments />} />
+          <Route path="reports" element={<DriverReports />} />
+          <Route path="settings" element={<DriverSettings />} />
+        </Route>
         
         {/* Catch all route - 404 */}
         <Route path="*" element={<div>404 Not Found</div>} />

@@ -71,9 +71,9 @@ const userSchema = new mongoose.Schema(
     busAssigned: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Bus',
-      required: function() {
-        return this.role === 'driver';
-      }
+      // required: function() {
+      //   return this.role === 'driver';
+      // }
     },
     routes: [{
       type: mongoose.Schema.Types.ObjectId,
