@@ -3,16 +3,15 @@ import { motion } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { 
   HiUserCircle, 
-  HiSearch, 
   HiChevronDown, 
   HiOutlinePencil, 
   HiCheck, 
-  HiX,
   HiClock,
   HiHome,
   HiExclamationCircle,
   HiPlus
 } from 'react-icons/hi2';
+import { HiSearch, HiX } from 'react-icons/hi';
 import { TbBusStop } from 'react-icons/tb';
 
 export default function Attendance() {

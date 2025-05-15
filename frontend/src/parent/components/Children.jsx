@@ -1,98 +1,210 @@
-import React, { useState } from 'react'
-import { motion } from 'motion/react'
-import { toast } from 'react-hot-toast'
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
+import { toast } from 'react-hot-toast';
+import { 
+  useGetChildrenQuery, 
+  useCreateChildMutation, 
+  useDeleteChildMutation,
+  useUpdateChildMutation 
+} from '../../redux/features/childSlice';
+import { useGetActiveRoutesQuery } from '../../redux/features/routeSlice';
+import { HiPlus, HiPencil, HiTrash, HiX } from 'react-icons/hi';
 
 export default function Children() {
-  const [isAddingChild, setIsAddingChild] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentChildId, setCurrentChildId] = useState(null);
   
-  // Mock data - in a real app this would come from an API
-  const [children, setChildren] = useState([
-    {
-      id: 1, 
-      name: "Emma Parent", 
-      age: 8,
-      grade: "3rd Grade",
-      school: "Lincoln Elementary",
-      busId: "Bus #12",
-      busRoute: "Route A",
-      pickupTime: "7:15 AM",
-      dropoffTime: "3:30 PM",
-      avatar: "https://randomuser.me/api/portraits/girls/12.jpg"
-    },
-    {
-      id: 2, 
-      name: "Jacob Parent", 
-      age: 10,
-      grade: "5th Grade",
-      school: "Washington Middle School",
-      busId: "Bus #15",
-      busRoute: "Route C",
-      pickupTime: "7:30 AM",
-      dropoffTime: "3:45 PM",
-      avatar: "https://randomuser.me/api/portraits/boys/15.jpg"
-    }
-  ]);
+  // API queries
+  const { data: childrenData, isLoading, isError } = useGetChildrenQuery();
+  const { data: routesData, isLoading: isLoadingRoutes } = useGetActiveRoutesQuery();
+  const [createChild, { isLoading: isCreating }] = useCreateChildMutation();
+  const [updateChild, { isLoading: isUpdating }] = useUpdateChildMutation();
+  const [deleteChild, { isLoading: isDeleting }] = useDeleteChildMutation();
   
   const [newChild, setNewChild] = useState({
-    name: '',
-    age: '',
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '',
+    gender: '',
+    schoolName: '',
     grade: '',
-    school: '',
-    busId: '',
-    busRoute: '',
+    pickupAddress: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    },
+    dropoffAddress: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    },
+    route: '', 
+    specialNeeds: {
+      has: false,
+      details: ''
+    }
   });
   
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewChild(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // Reset form when modal is closed
+  useEffect(() => {
+    if (!isModalOpen) {
+      resetForm();
+    }
+  }, [isModalOpen]);
+
+  const resetForm = () => {
+    setNewChild({
+      firstName: '',
+      lastName: '',
+      dateOfBirth: '',
+      gender: '',
+      schoolName: '',
+      grade: '',
+      pickupAddress: {
+        street: '',
+        city: '',
+        state: '',
+        zipCode: ''
+      },
+      dropoffAddress: {
+        street: '',
+        city: '',
+        state: '',
+        zipCode: ''
+      },
+      route: '',
+      specialNeeds: {
+        has: false,
+        details: ''
+      }
+    });
+    setIsEditMode(false);
+    setCurrentChildId(null);
   };
   
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     
-    // Validate form
-    if (!newChild.name || !newChild.age || !newChild.grade || !newChild.school || !newChild.busId || !newChild.busRoute) {
-      toast.error("Please fill in all required fields");
-      return;
+    // Handle nested object properties
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setNewChild(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: type === 'checkbox' ? checked : value
+        }
+      }));
+    } else {
+      setNewChild(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
     }
-    
-    // Create new child with mock data
-    const child = {
-      ...newChild,
-      id: Date.now(),
-      pickupTime: "7:15 AM",
-      dropoffTime: "3:30 PM",
-      avatar: `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'women' : 'men'}/${Math.floor(Math.random() * 50)}.jpg`
-    };
-    
-    // Add to children array
-    setChildren(prev => [...prev, child]);
-    
-    // Reset form
+  };
+  
+  const handleEdit = (child) => {
+    // Fill the form with the selected child's data
     setNewChild({
-      name: '',
-      age: '',
-      grade: '',
-      school: '',
-      busId: '',
-      busRoute: '',
+      firstName: child.firstName,
+      lastName: child.lastName,
+      dateOfBirth: new Date(child.dateOfBirth).toISOString().split('T')[0],
+      gender: child.gender,
+      schoolName: child.schoolName,
+      grade: child.grade,
+      pickupAddress: {
+        street: child.pickupAddress?.street || '',
+        city: child.pickupAddress?.city || '',
+        state: child.pickupAddress?.state || '',
+        zipCode: child.pickupAddress?.zipCode || ''
+      },
+      dropoffAddress: {
+        street: child.dropoffAddress?.street || '',
+        city: child.dropoffAddress?.city || '',
+        state: child.dropoffAddress?.state || '',
+        zipCode: child.dropoffAddress?.zipCode || ''
+      },
+      route: child.route || '',
+      specialNeeds: {
+        has: child.specialNeeds?.has || false,
+        details: child.specialNeeds?.details || ''
+      }
     });
     
-    // Close form
-    setIsAddingChild(false);
-    
-    // Show success message
-    toast.success("Child added successfully!");
+    setIsEditMode(true);
+    setCurrentChildId(child._id);
+    setIsModalOpen(true);
   };
   
-  const handleRemove = (id) => {
-    if (window.confirm("Are you sure you want to remove this child?")) {
-      setChildren(prev => prev.filter(child => child.id !== id));
-      toast.success("Child removed successfully");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      // Create a copy of the child object to modify before submission
+      const childToSubmit = { ...newChild };
+      
+      // If no route is selected, set it to null instead of empty string
+      if (!childToSubmit.route) {
+        childToSubmit.route = null;
+      }
+      
+      if (isEditMode) {
+        await updateChild({
+          id: currentChildId,
+          ...childToSubmit
+        }).unwrap();
+        
+        // Show success message
+        toast.success("Child updated successfully!");
+      } else {
+        await createChild(childToSubmit).unwrap();
+        
+        // Show success message
+        toast.success("Child added successfully!");
+      }
+      
+      // Close form
+      setIsModalOpen(false);
+      
+    } catch (error) {
+      console.error(isEditMode ? "Failed to update child:" : "Failed to add child:", error);
+      toast.error(error.data?.message || (isEditMode ? "Failed to update child. Please try again." : "Failed to add child. Please try again."));
     }
+  };
+  
+  const handleRemove = async (id) => {
+    if (window.confirm("Are you sure you want to remove this child?")) {
+      try {
+        await deleteChild(id).unwrap();
+        toast.success("Child removed successfully");
+      } catch (error) {
+        console.error("Failed to remove child:", error);
+        toast.error(error.data?.message || "Failed to remove child. Please try again.");
+      }
+    }
+  };
+
+  // Function to format date of birth for display
+  const formatDateOfBirth = (dateOfBirth) => {
+    const date = new Date(dateOfBirth);
+    return date.toLocaleDateString();
+  };
+
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
   };
 
   return (
@@ -100,55 +212,110 @@ export default function Children() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">My Children</h1>
         <button
-          onClick={() => setIsAddingChild(true)}
+          onClick={() => setIsModalOpen(true)}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center"
+          disabled={isCreating}
         >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
+          <HiPlus className="w-4 h-4 mr-2" />
           Add Child
         </button>
       </div>
       
-      {isAddingChild && (
+      {isLoading && (
+        <div className="text-center py-10">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <p className="mt-2 text-gray-600">Loading children...</p>
+        </div>
+      )}
+      
+      {isError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+          <p>Failed to load children. Please try again later.</p>
+        </div>
+      )}
+      
+      {isModalOpen && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white p-6 rounded-xl shadow-sm mb-6 border border-gray-200"
         >
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Add New Child</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              {isEditMode ? 'Edit Child' : 'Add New Child'}
+            </h2>
             <button 
-              onClick={() => setIsAddingChild(false)}
+              onClick={() => setIsModalOpen(false)}
               className="text-gray-500 hover:text-gray-700"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <HiX className="w-5 h-5" />
             </button>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Personal Information */}
               <div>
-                <label htmlFor="name" className="block text-gray-700 text-sm font-medium mb-1">Child's Full Name*</label>
+                <label htmlFor="firstName" className="block text-gray-700 text-sm font-medium mb-1">First Name*</label>
                 <input
                   type="text"
-                  id="name"
-                  name="name"
-                  value={newChild.name}
+                  id="firstName"
+                  name="firstName"
+                  value={newChild.firstName}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="age" className="block text-gray-700 text-sm font-medium mb-1">Age*</label>
+                <label htmlFor="lastName" className="block text-gray-700 text-sm font-medium mb-1">Last Name*</label>
                 <input
-                  type="number"
-                  id="age"
-                  name="age"
-                  value={newChild.age}
+                  type="text"
+                  id="lastName"
+                  name="lastName"
+                  value={newChild.lastName}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="dateOfBirth" className="block text-gray-700 text-sm font-medium mb-1">Date of Birth*</label>
+                <input
+                  type="date"
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  value={newChild.dateOfBirth}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="gender" className="block text-gray-700 text-sm font-medium mb-1">Gender*</label>
+                <select
+                  id="gender"
+                  name="gender"
+                  value={newChild.gender}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                  required
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              
+              {/* School Information */}
+              <div>
+                <label htmlFor="schoolName" className="block text-gray-700 text-sm font-medium mb-1">School*</label>
+                <input
+                  type="text"
+                  id="schoolName"
+                  name="schoolName"
+                  value={newChild.schoolName}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
                   required
@@ -166,65 +333,125 @@ export default function Children() {
                   required
                 />
               </div>
-              <div>
-                <label htmlFor="school" className="block text-gray-700 text-sm font-medium mb-1">School*</label>
-                <input
-                  type="text"
-                  id="school"
-                  name="school"
-                  value={newChild.school}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                  required
-                />
+              
+              {/* Pickup Address */}
+              <div className="col-span-2">
+                <h3 className="font-medium text-gray-700 mb-2">Pickup Address</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <input
+                      type="text"
+                      name="pickupAddress.street"
+                      value={newChild.pickupAddress.street}
+                      onChange={handleChange}
+                      placeholder="Street"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="pickupAddress.city"
+                      value={newChild.pickupAddress.city}
+                      onChange={handleChange}
+                      placeholder="City"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="pickupAddress.state"
+                      value={newChild.pickupAddress.state}
+                      onChange={handleChange}
+                      placeholder="State"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="pickupAddress.zipCode"
+                      value={newChild.pickupAddress.zipCode}
+                      onChange={handleChange}
+                      placeholder="ZIP Code"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                    />
+                  </div>
+                </div>
               </div>
+              
+              {/* Route Selection */}
               <div>
-                <label htmlFor="busId" className="block text-gray-700 text-sm font-medium mb-1">Bus ID*</label>
+                <label htmlFor="route" className="block text-gray-700 text-sm font-medium mb-1">Bus Route (Optional)</label>
                 <select
-                  id="busId"
-                  name="busId"
-                  value={newChild.busId}
+                  id="route"
+                  name="route"
+                  value={newChild.route}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                  required
                 >
-                  <option value="">Select a bus</option>
-                  <option value="Bus #12">Bus #12</option>
-                  <option value="Bus #15">Bus #15</option>
-                  <option value="Bus #23">Bus #23</option>
+                  <option value="">-- Select a bus route --</option>
+                  {routesData?.data?.map(route => (
+                    <option key={route._id} value={route._id}>
+                      {route.name} ({route.type === 'morning' ? 'Morning' : 'Afternoon'} - {route.school})
+                    </option>
+                  ))}
                 </select>
+                {isLoadingRoutes && <p className="text-xs text-gray-500 mt-1">Loading routes...</p>}
               </div>
-              <div>
-                <label htmlFor="busRoute" className="block text-gray-700 text-sm font-medium mb-1">Bus Route*</label>
-                <select
-                  id="busRoute"
-                  name="busRoute"
-                  value={newChild.busRoute}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                  required
-                >
-                  <option value="">Select a route</option>
-                  <option value="Route A">Route A</option>
-                  <option value="Route B">Route B</option>
-                  <option value="Route C">Route C</option>
-                </select>
+              
+              {/* Special Needs Checkbox */}
+              <div className="col-span-2">
+                <div className="flex items-center mb-2">
+                  <input
+                    type="checkbox"
+                    id="specialNeeds.has"
+                    name="specialNeeds.has"
+                    checked={newChild.specialNeeds.has}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="specialNeeds.has" className="ml-2 block text-sm text-gray-700">
+                    Child has special needs
+                  </label>
+                </div>
+                
+                {newChild.specialNeeds.has && (
+                  <textarea
+                    name="specialNeeds.details"
+                    value={newChild.specialNeeds.details}
+                    onChange={handleChange}
+                    placeholder="Please provide details about special needs"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                    rows="3"
+                  ></textarea>
+                )}
               </div>
             </div>
             
             <div className="pt-4 flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setIsAddingChild(false)}
+                onClick={() => setIsModalOpen(false)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isCreating || isUpdating}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center"
+                disabled={isCreating || isUpdating}
               >
-                Add Child
+                {(isCreating || isUpdating) ? (
+                  <>
+                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    {isEditMode ? 'Updating...' : 'Adding...'}
+                  </>
+                ) : (
+                  <>{isEditMode ? 'Update Child' : 'Add Child'}</>
+                )}
               </button>
             </div>
           </form>
@@ -232,9 +459,9 @@ export default function Children() {
       )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {children.map(child => (
+        {!isLoading && childrenData?.data && childrenData.data.map(child => (
           <motion.div
-            key={child.id}
+            key={child._id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -242,33 +469,32 @@ export default function Children() {
           >
             <div className="p-5">
               <div className="flex items-center">
-                <img 
-                  src={child.avatar} 
-                  alt={child.name} 
-                  className="w-16 h-16 rounded-full object-cover mr-4"
-                />
+                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl font-bold text-indigo-600 mr-4">
+                  {child.firstName.charAt(0)}{child.lastName.charAt(0)}
+                </div>
                 <div>
-                  <h3 className="font-semibold text-lg text-gray-800">{child.name}</h3>
-                  <div className="text-sm text-gray-500">{child.age} years old • {child.grade}</div>
+                  <h3 className="font-semibold text-lg text-gray-800">{child.firstName} {child.lastName}</h3>
+                  <div className="text-sm text-gray-500">{calculateAge(child.dateOfBirth)} years old • {child.grade}</div>
                   <div className="flex items-center mt-1">
-                    <span className="px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 mr-2">{child.busId}</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">{child.busRoute}</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 mr-2">{child.schoolName}</span>
                   </div>
                 </div>
               </div>
               
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-gray-500">School</p>
-                  <p className="font-medium text-gray-800">{child.school}</p>
+                  <p className="text-gray-500">Date of Birth</p>
+                  <p className="font-medium text-gray-800">{formatDateOfBirth(child.dateOfBirth)}</p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-gray-500">Pickup Time</p>
-                  <p className="font-medium text-gray-800">{child.pickupTime}</p>
+                  <p className="text-gray-500">Gender</p>
+                  <p className="font-medium text-gray-800">{child.gender.charAt(0).toUpperCase() + child.gender.slice(1)}</p>
                 </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-gray-500">Drop-off Time</p>
-                  <p className="font-medium text-gray-800">{child.dropoffTime}</p>
+                <div className="bg-gray-50 p-3 rounded-lg col-span-2">
+                  <p className="text-gray-500">Pickup Address</p>
+                  <p className="font-medium text-gray-800">
+                    {child.pickupAddress?.street} {child.pickupAddress?.city}, {child.pickupAddress?.state} {child.pickupAddress?.zipCode}
+                  </p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">
                   <div>
@@ -276,50 +502,51 @@ export default function Children() {
                   </div>
                   <div className="flex space-x-2">
                     <button 
-                      onClick={() => handleRemove(child.id)}
+                      onClick={() => handleRemove(child._id)}
                       className="p-1 text-red-500 hover:bg-red-50 rounded"
                       title="Remove child"
+                      disabled={isDeleting}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <HiTrash className="w-4 h-4" />
                     </button>
                     <button 
+                      onClick={() => handleEdit(child)}
                       className="p-1 text-blue-500 hover:bg-blue-50 rounded"
                       title="Edit child"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
+                      <HiPencil className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               </div>
+
+              {child.specialNeeds?.has && (
+                <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm font-medium text-yellow-800">Special Needs:</p>
+                  <p className="text-sm text-yellow-700">{child.specialNeeds.details}</p>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}
       </div>
       
-      {children.length === 0 && (
+      {!isLoading && (!childrenData?.data || childrenData.data.length === 0) && (
         <div className="bg-white p-10 rounded-xl shadow-sm border border-gray-200 text-center">
           <div className="text-gray-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
+            <HiPlus className="w-16 h-16 mx-auto" />
           </div>
           <h3 className="text-lg font-medium text-gray-700 mb-1">No children added yet</h3>
           <p className="text-gray-500 mb-4">Add your children to track their school bus transportation</p>
           <button
-            onClick={() => setIsAddingChild(true)}
+            onClick={() => setIsModalOpen(true)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors inline-flex items-center"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
+            <HiPlus className="w-4 h-4 mr-2" />
             Add Your First Child
           </button>
         </div>
       )}
     </div>
-  )
+  );
 }
