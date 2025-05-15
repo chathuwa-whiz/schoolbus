@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'motion/react'
-import { toast } from 'react-hot-toast'
-import { useLoginMutation } from '../redux/features/authSlice'
-import Header from '../home/components/Header'
-import Footer from '../home/components/Footer'
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { toast } from 'react-hot-toast';
+import { useDispatch } from 'react-redux';
+import { useLoginMutation } from '../redux/features/userSlice';
+import Header from '../home/components/Header';
+import Footer from '../home/components/Footer';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [login, { isLoading, isSuccess, error }] = useLoginMutation();
+  const dispatch = useDispatch();
+  const [login, { isLoading, isSuccess, error, data }] = useLoginMutation();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -19,15 +21,22 @@ export default function Login() {
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && data) {
       toast.success('Login successful!');
-      navigate('/parent/dashboard');
+      // Navigate after a short delay for better UX
+      setTimeout(() => {
+        navigate('/parent');
+      }, 500);
     }
     
     if (error) {
-      toast.error(error?.data?.message || 'Login failed. Please check your credentials.');
+      // Better error display with specific backend messages
+      const errorMsg = 
+        error.data?.message || 
+        'Login failed. Please check your credentials.';
+      toast.error(errorMsg);
     }
-  }, [isSuccess, error, navigate]);
+  }, [isSuccess, error, navigate, data]);
 
   const validateForm = () => {
     const errors = {};
@@ -171,26 +180,11 @@ export default function Login() {
                 </div>
               </div>
             </motion.div>
-
-            {/* School Bus Illustration */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="mt-10 text-center"
-            >
-              <img 
-                src="/schoolbus.png" 
-                alt="School Bus" 
-                className="h-16 mx-auto opacity-60" 
-              />
-              <p className="text-gray-500 mt-3">Safe transit for every student</p>
-            </motion.div>
           </div>
         </div>
       </section>
       
       <Footer />
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import ProtectedRoute from './ProtectedRoute'
 import Home from './home/Home'
 import ParentRegister from './parent/Register'
 import ParentLogin from './parent/Login'
@@ -15,21 +15,9 @@ import Payments from './parent/components/Payment'
 import Notifications from './parent/components/Notifications'
 import Settings from './parent/components/Settings'
 
-// Auth guard for protected routes
-const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = localStorage.getItem('token');
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/parent/login" replace />;
-  }
-  
-  return children;
-};
-
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster position="bottom-center" reverseOrder={false} />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />

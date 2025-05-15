@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'motion/react'
-import { toast } from 'react-hot-toast'
-import { useRegisterMutation } from '../redux/features/authSlice'
-import Header from '../home/components/Header'
-import Footer from '../home/components/Footer'
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { toast } from 'react-hot-toast';
+import { useDispatch } from 'react-redux';
+import { useRegisterMutation } from '../redux/features/userSlice';
+import Header from '../home/components/Header';
+import Footer from '../home/components/Footer';
 
 export default function Register() {
   const navigate = useNavigate();
-  const [register, { isLoading, isSuccess, error }] = useRegisterMutation();
+  const dispatch = useDispatch();
+  const [register, { isLoading, isSuccess, error, data }] = useRegisterMutation();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -24,15 +26,22 @@ export default function Register() {
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && data) {
       toast.success('Registration successful! Please log in.');
-      navigate('/parent/login');
+      // Navigate after a short delay for better UX
+      setTimeout(() => {
+        navigate('/parent/login');
+      }, 1000);
     }
     
     if (error) {
-      toast.error(error?.data?.message || 'Registration failed. Please try again.');
+      // Better error display with specific backend messages
+      const errorMsg = 
+        error.data?.message || 
+        'Registration failed. Please try again.';
+      toast.error(errorMsg);
     }
-  }, [isSuccess, error, navigate]);
+  }, [isSuccess, error, navigate, data]);
 
   const validateForm = () => {
     const errors = {};
@@ -89,7 +98,9 @@ export default function Register() {
     
     if (validateForm()) {
       try {
-        await register(formData).unwrap();
+        // Remove confirmPassword as it's not needed in the backend
+        const { confirmPassword, ...userData } = formData;
+        await register(userData).unwrap();
       } catch (err) {
         // Error is handled in useEffect
       }
@@ -144,6 +155,7 @@ export default function Register() {
                   </div>
                 </div>
                 
+                {/* Form Fields - keeping these the same as they look good */}
                 <div className="md:w-1/2 p-8">
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold text-gray-800">Parent Registration</h3>
@@ -289,5 +301,5 @@ export default function Register() {
       
       <Footer />
     </div>
-  )
+  );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { HiBars3, HiXMark } from 'react-icons/hi2'
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -30,7 +31,7 @@ export default function Header() {
               Contact
             </Link>
             <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+              <Link to="/parent/login" className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
                 Log in
               </Link>
               <Link to="/parent/register" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
@@ -45,13 +46,9 @@ export default function Header() {
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             {isMenuOpen ? (
-              <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <HiXMark className="h-6 w-6" />
             ) : (
-              <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <HiBars3 className="h-6 w-6" />
             )}
           </button>
         </div>
@@ -71,7 +68,7 @@ export default function Header() {
               Contact
             </Link>
             <div className="pt-2 pb-3 border-t border-gray-200">
-              <Link to="/login" className="block py-2 px-4 rounded hover:bg-gray-100 text-indigo-600 font-medium">
+              <Link to="/parent/login" className="block py-2 px-4 rounded hover:bg-gray-100 text-indigo-600 font-medium">
                 Log in
               </Link>
               <Link to="/parent/register" className="block py-2 px-4 rounded bg-indigo-600 text-white font-medium mt-2">

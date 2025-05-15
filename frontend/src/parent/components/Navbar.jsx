@@ -1,10 +1,15 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'react-hot-toast'
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { toast } from 'react-hot-toast';
+import { logout } from '../../redux/features/authSlice';
+import { HiBell, HiBars3, HiChevronDown } from 'react-icons/hi2';
 
 export default function Navbar({ toggleSidebar }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   
   const notifications = [
     { id: 1, text: "Your child was picked up at 7:15 AM", time: "1h ago", isNew: true },
@@ -13,10 +18,9 @@ export default function Navbar({ toggleSidebar }) {
   ];
   
   const handleLogout = () => {
-    // Clear token from localStorage
-    localStorage.removeItem('token');
+    dispatch(logout());
     toast.success('Logged out successfully');
-    // Redirect to home page happens in App.jsx with protected routes
+    navigate('/parent/login');
   };
 
   return (
