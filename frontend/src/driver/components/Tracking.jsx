@@ -1,16 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { toast } from 'react-hot-toast';
+import { 
+  useStartTrackingMutation,
+  useUpdateLocationMutation,
+  useEndTrackingMutation,
+  useReportEmergencyMutation,
+  useGetBusTrackingQuery
+} from '../../redux/features/trackingSlice';
+import { initializeSocket } from '../../utils/socket';
 
 export default function Tracking() {
-  const [isTracking, setIsTracking] = useState(true);
+  // State
+  const [isTracking, setIsTracking] = useState(false);
   const [locationUpdateFrequency, setLocationUpdateFrequency] = useState(30); // seconds
   const [currentLocation, setCurrentLocation] = useState({
-    latitude: 37.7749,
-    longitude: -122.4194,
-    speed: 25,
-    heading: 90,
-    lastUpdated: new Date().toLocaleTimeString()
+    latitude: 0,
+    longitude: 0,
+    speed: 0,
+    heading: 0,
+    lastUpdated: 'Not yet available'
   });
+  const [trackingHistory, setTrackingHistory] = useState([]);
+  const [selectedBusId, setSelectedBusId] = useState(''); // You might get this from user context or props
+  const [selectedRouteId, setSelectedRouteId] = useState(''); // You might get this from user context or props
+  const [emergencyDetails, setEmergencyDetails] = useState('');
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  
+  // API hooks
+  const [startTracking, { isLoading: isStartingTracking }] = useStartTrackingMutation();
+  const [updateLocation, { isLoading: isUpdatingLocation }] = useUpdateLocationMutation();
+  const [endTracking, { isLoading: isEndingTracking }] = useEndTrackingMutation();
+  const [reportEmergency, { isLoading: isReportingEmergency }] = useReportEmergencyMutation();
+  
+  // Get current tracking data if exists
+  const { 
+    data: trackingData,
+    isLoading: isLoadingTracking,
+    refetch: refetchTracking
+  } = useGetBusTrackingQuery(selectedBusId, {
+    skip: !selectedBusId,
+    pollingInterval: 60000 // Fallback polling every minute if sockets fail
+  });
+  
+  // Socket reference
+  const socketRef = React.useRef(null);
 
   // Simulate location updates
   useEffect(() => {
@@ -30,6 +64,240 @@ export default function Tracking() {
     
     return () => clearInterval(interval);
   }, [isTracking, locationUpdateFrequency]);
+
+  // Simulate tracking history data
+  useEffect(() => {
+    const history = [];
+    for (let i = 0; i < 10; i++) {
+      history.push({
+        time: `${7 + i}:00 AM`,
+        location: `Location ${i + 1}`,
+        speed: `${Math.floor(Math.random() * 60)} mph`,
+        event: i % 2 === 0 ? 'Regular' : 'Irregular'
+      });
+    }
+    setTrackingHistory(history);
+  }, []);
+
+  // Report emergency
+  const handleEmergencyReport = async () => {
+    if (!emergencyDetails) {
+      toast.error('Please provide emergency details');
+      return;
+    }
+    
+    try {
+      await reportEmergency({
+        busId: selectedBusId,
+        details: emergencyDetails,
+        location: currentLocation ? {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          name: 'Current location' // You might want to use reverse geocoding to get actual address
+        } : undefined
+      }).unwrap();
+      
+      toast.success('Emergency reported. Help is on the way.');
+      setShowEmergencyModal(false);
+      setEmergencyDetails('');
+    } catch (error) {
+      toast.error('Failed to report emergency');
+      console.error('Emergency reporting error:', error);
+    }
+  };
+
+  // Toggle tracking state
+  const toggleTracking = async () => {
+    if (isTracking) {
+      // End tracking
+      try {
+        await endTracking({ busId: selectedBusId }).unwrap();
+        setIsTracking(false);
+        toast.success('Tracking ended successfully');
+      } catch (error) {
+        toast.error('Failed to end tracking');
+        console.error('End tracking error:', error);
+      }
+    } else {
+      // Start tracking
+      if (!currentLocation) {
+        // Try to get initial location
+        navigator.geolocation.getCurrentPosition((position) => {
+          const { latitude, longitude } = position.coords;
+          
+          startTrackingSession({ latitude, longitude });
+        }, (error) => {
+          toast.error(`Can't get location: ${error.message}`);
+          console.error('GPS Error:', error);
+        }, { enableHighAccuracy: true });
+      } else {
+        startTrackingSession(currentLocation);
+      }
+    }
+  };
+  
+  // Start a tracking session
+  const startTrackingSession = async (location) => {
+    try {
+      if (!selectedBusId || !selectedRouteId) {
+        toast.error('Bus and route must be selected');
+        return;
+      }
+      
+      await startTracking({
+        busId: selectedBusId,
+        routeId: selectedRouteId,
+        currentLocation: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          speed: location.speed || 0,
+          heading: location.heading || 0
+        }
+      }).unwrap();
+      
+      setIsTracking(true);
+      toast.success('Tracking started successfully');
+    } catch (error) {
+      toast.error('Failed to start tracking');
+      console.error('Start tracking error:', error);
+    }
+  };
+
+  // Setup socket connection
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const socket = initializeSocket(token);
+      socketRef.current = socket;
+      
+      socket.on('driver:tracking_started', (data) => {
+        toast.success('Tracking session started successfully');
+        refetchTracking();
+      });
+      
+      socket.on('driver:emergency_reported', (data) => {
+        toast.error('Emergency reported. Authorities have been notified.');
+        refetchTracking();
+      });
+      
+      return () => {
+        socket.off('driver:tracking_started');
+        socket.off('driver:emergency_reported');
+      };
+    }
+  }, [refetchTracking]);
+
+  // Setup GPS tracking
+  useEffect(() => {
+    let watchId;
+    let updateInterval;
+
+    const successCallback = (position) => {
+      const { latitude, longitude, speed, heading } = position.coords;
+      setCurrentLocation(prev => ({
+        latitude,
+        longitude,
+        speed: speed ? speed * 2.23694 : prev?.speed || 0, // convert m/s to mph
+        heading: heading || prev?.heading || 0,
+        lastUpdated: new Date().toLocaleTimeString()
+      }));
+    };
+
+    const errorCallback = (error) => {
+      toast.error(`Location error: ${error.message}`);
+      console.error('GPS Error:', error);
+    };
+
+    // Start tracking if enabled
+    if (isTracking) {
+      // Use browser geolocation API
+      if (navigator.geolocation) {
+        // Get initial location
+        navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+        
+        // Watch position with high accuracy
+        watchId = navigator.geolocation.watchPosition(
+          successCallback,
+          errorCallback,
+          { 
+            enableHighAccuracy: true, 
+            maximumAge: 30000, 
+            timeout: 27000 
+          }
+        );
+        
+        // Set interval to update location on server
+        updateInterval = setInterval(() => {
+          if (currentLocation) {
+            updateLocationOnServer();
+          }
+        }, locationUpdateFrequency * 1000);
+      } else {
+        toast.error("Geolocation is not supported by this browser.");
+      }
+    }
+    
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      clearInterval(updateInterval);
+    };
+  }, [isTracking, locationUpdateFrequency]);
+  
+  // Function to update location on server
+  const updateLocationOnServer = async () => {
+    if (!currentLocation || !selectedBusId) return;
+    
+    try {
+      await updateLocation({
+        busId: selectedBusId,
+        currentLocation: {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          speed: currentLocation.speed,
+          heading: currentLocation.heading,
+          timestamp: new Date()
+        }
+      }).unwrap();
+    } catch (error) {
+      console.error('Failed to update location:', error);
+    }
+  };
+
+  // Initialize data when tracking data is loaded
+  useEffect(() => {
+    if (trackingData && trackingData.success) {
+      setIsTracking(trackingData.data.isActive);
+      
+      if (trackingData.data.currentLocation) {
+        setCurrentLocation({
+          latitude: trackingData.data.currentLocation.latitude,
+          longitude: trackingData.data.currentLocation.longitude,
+          speed: trackingData.data.currentLocation.speed || 0,
+          heading: trackingData.data.currentLocation.heading || 0,
+          lastUpdated: new Date(trackingData.data.currentLocation.timestamp).toLocaleTimeString()
+        });
+      }
+      
+      // Set tracking history
+      if (trackingData.data.dayHistory && trackingData.data.dayHistory.length > 0) {
+        setTrackingHistory(trackingData.data.dayHistory.map(item => ({
+          time: new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          location: item.location,
+          speed: item.speed ? `${Math.round(item.speed)} mph` : '0 mph',
+          event: item.event
+        })));
+      }
+      
+      // Set route and bus IDs if not already set
+      if (!selectedRouteId && trackingData.data.routeId) {
+        setSelectedRouteId(trackingData.data.routeId);
+      }
+      
+      if (!selectedBusId && trackingData.data.busId) {
+        setSelectedBusId(trackingData.data.busId);
+      }
+    }
+  }, [trackingData, selectedBusId, selectedRouteId]);
 
   return (
     <div className="space-y-6">
@@ -57,7 +325,7 @@ export default function Tracking() {
             <div className="flex justify-between items-center">
               <h2 className="font-semibold text-gray-800 text-lg">Live Location</h2>
               <div className="text-sm text-gray-600">
-                Last updated: {currentLocation.lastUpdated}
+                Last updated: {currentLocation?.lastUpdated || 'Not available'}
               </div>
             </div>
           </div>
@@ -76,12 +344,12 @@ export default function Tracking() {
                 <div>
                   <span className="text-gray-500 text-sm">Current coordinates:</span>
                   <h3 className="font-medium">
-                    {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                    {currentLocation ? `${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}` : 'Waiting for GPS...'}
                   </h3>
                 </div>
                 <div className="text-right">
                   <span className="text-gray-500 text-sm">Current speed:</span>
-                  <h3 className="font-medium">{Math.round(currentLocation.speed)} mph</h3>
+                  <h3 className="font-medium">{currentLocation ? `${Math.round(currentLocation.speed)} mph` : 'N/A'}</h3>
                 </div>
               </div>
             </div>
@@ -108,7 +376,8 @@ export default function Tracking() {
                     type="checkbox" 
                     className="sr-only" 
                     checked={isTracking}
-                    onChange={() => setIsTracking(!isTracking)}
+                    onChange={toggleTracking}
+                    disabled={isReportingEmergency}
                   />
                   <div className={`block w-14 h-8 rounded-full ${isTracking ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                   <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${isTracking ? 'transform translate-x-6' : ''}`}></div>
@@ -170,7 +439,11 @@ export default function Tracking() {
             
             {/* Emergency button */}
             <div>
-              <button className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center">
+              <button 
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
+                onClick={() => setShowEmergencyModal(true)}
+                disabled={!isTracking || isReportingEmergency}
+              >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -207,42 +480,22 @@ export default function Tracking() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">7:00 AM</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Bus Depot</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">0 mph</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Route started</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">7:15 AM</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">52 Oak Street</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">0 mph</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Student pickup (Alex Johnson)</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">7:22 AM</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">108 Maple Avenue</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">0 mph</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Student pickup (Emma Wilson)</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">7:35 AM</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">221 Pine Road</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">0 mph</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Student pickup (Sophia Garcia)</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">7:42 AM</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">15 Elm Drive</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">0 mph</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Student pickup (Michael Brown)</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">8:15 AM</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">Lincoln Elementary School</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">0 mph</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">All students dropped off</td>
-                </tr>
+                {trackingHistory.length > 0 ? (
+                  trackingHistory.map((entry, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{entry.time}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{entry.location}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{entry.speed}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{entry.event}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
+                      No tracking history available for today
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -254,6 +507,47 @@ export default function Tracking() {
           </div>
         </div>
       </motion.div>
+
+      {/* Emergency Modal */}
+      {showEmergencyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-lg w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-red-600">Report Emergency</h3>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Emergency Details
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 h-32"
+                placeholder="Describe the emergency situation..."
+                value={emergencyDetails}
+                onChange={(e) => setEmergencyDetails(e.target.value)}
+              ></textarea>
+              
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
+                  onClick={() => setShowEmergencyModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                  onClick={handleEmergencyReport}
+                  disabled={isReportingEmergency}
+                >
+                  {isReportingEmergency && (
+                    <span className="mr-2 animate-spin">◌</span>
+                  )}
+                  Report Emergency
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

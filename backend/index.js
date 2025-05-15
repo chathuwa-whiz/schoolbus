@@ -1,15 +1,21 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
-import connectDB from './config/db.js';
 import dotenv from 'dotenv';
+import connectDB from './config/db.js';
+import { initSocketIO } from './utils/socket.js';
 import userRoutes from './routes/userRoutes.js';
 import childRoutes from './routes/childRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
+import trackingRoutes from './routes/trackingRoutes.js';
 
 // Initialize express app
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
+
+// Initialize socket.io
+initSocketIO(server);
 
 // Connect to MongoDB
 connectDB();
@@ -23,7 +29,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/users', userRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/routes', routeRoutes);
+app.use('/api/tracking', trackingRoutes);
 
-app.listen(process.env.PORT, () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });

@@ -3,6 +3,7 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 import { userApi } from './features/userSlice';
 import { childApi } from './features/childSlice';
 import { routeApi } from './features/routeSlice';
+import { trackingApi } from './features/trackingSlice';
 import authReducer from './features/authSlice';
 
 export const store = configureStore({
@@ -10,13 +11,15 @@ export const store = configureStore({
     [userApi.reducerPath]: userApi.reducer,
     [childApi.reducerPath]: childApi.reducer,
     [routeApi.reducerPath]: routeApi.reducer,
+    [trackingApi.reducerPath]: trackingApi.reducer,
     auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
         .concat(userApi.middleware)
         .concat(childApi.middleware)
-        .concat(routeApi.middleware),
+        .concat(routeApi.middleware)
+        .concat(trackingApi.middleware),
 });
 
 setupListeners(store.dispatch);
