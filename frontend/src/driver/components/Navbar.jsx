@@ -107,12 +107,12 @@ export default function Navbar({ toggleSidebar }) {
             
             {showDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-10 border border-gray-200">
-                <Link
+                {/* <Link
                   to="/driver/profile"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Your Profile
-                </Link>
+                </Link> */}
                 <Link
                   to="/driver/settings"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
