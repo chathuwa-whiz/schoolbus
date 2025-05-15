@@ -1,6 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion } from 'motion/react'
 import { toast } from 'react-hot-toast'
+import { 
+  HiCheck, 
+  HiArrowDown, 
+  HiCurrencyDollar, 
+  HiClock, 
+  HiCog, 
+  HiInformationCircle,
+  HiBell,
+  HiTrash,
+  HiCheckCircle
+} from 'react-icons/hi2'
 
 export default function Notifications() {
   // In a real application, these would come from an API
@@ -133,50 +144,37 @@ export default function Notifications() {
       case 'pickup':
         return (
           <div className="bg-green-100 p-2 rounded-full">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+            <HiCheck className="w-5 h-5 text-green-600" />
           </div>
         );
       case 'dropoff':
         return (
           <div className="bg-blue-100 p-2 rounded-full">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <HiArrowDown className="w-5 h-5 text-blue-600" />
           </div>
         );
       case 'payment':
         return (
           <div className="bg-yellow-100 p-2 rounded-full">
-            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <HiCurrencyDollar className="w-5 h-5 text-yellow-600" />
           </div>
         );
       case 'delay':
         return (
           <div className="bg-orange-100 p-2 rounded-full">
-            <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <HiClock className="w-5 h-5 text-orange-600" />
           </div>
         );
       case 'system':
         return (
           <div className="bg-purple-100 p-2 rounded-full">
-            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <HiCog className="w-5 h-5 text-purple-600" />
           </div>
         );
       default:
         return (
           <div className="bg-gray-100 p-2 rounded-full">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <HiInformationCircle className="w-5 h-5 text-gray-600" />
           </div>
         );
     }
@@ -196,7 +194,7 @@ export default function Notifications() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="p-4 md:p-6"
+      className="p-4 md:p-6 md:pt-20"
     >
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Notifications</h1>
@@ -241,16 +239,16 @@ export default function Notifications() {
             <button
               onClick={markAllAsRead}
               disabled={notifications.length === 0}
-              className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-600 font-medium rounded-md hover:bg-indigo-100 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-600 font-medium rounded-md hover:bg-indigo-100 transition-colors disabled:opacity-50 flex items-center"
             >
-              Mark all read
+              <HiCheckCircle className="w-4 h-4 mr-1" /> Mark all read
             </button>
             <button
               onClick={clearAllNotifications}
               disabled={notifications.length === 0}
-              className="px-3 py-1.5 text-sm bg-red-50 text-red-600 font-medium rounded-md hover:bg-red-100 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-sm bg-red-50 text-red-600 font-medium rounded-md hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center"
             >
-              Clear all
+              <HiTrash className="w-4 h-4 mr-1" /> Clear all
             </button>
           </div>
         </div>
@@ -270,6 +268,7 @@ export default function Notifications() {
                   transition={{ duration: 0.3 }}
                   className={`bg-white rounded-xl border ${notification.isRead ? 'border-gray-200' : 'border-indigo-300'} p-4 shadow-sm relative overflow-hidden`}
                 >
+                  {/* Unread indicator dot */}
                   {!notification.isRead && (
                     <div className="absolute top-0 right-0 h-2 w-2 bg-indigo-600 rounded-full m-2"></div>
                   )}
@@ -289,15 +288,17 @@ export default function Notifications() {
                         {!notification.isRead && (
                           <button
                             onClick={() => markAsRead(notification.id)}
-                            className="text-sm text-indigo-600 hover:text-indigo-800"
+                            className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
                           >
+                            <HiCheck className="w-4 h-4 mr-1" />
                             Mark as read
                           </button>
                         )}
                         <button
                           onClick={() => deleteNotification(notification.id)}
-                          className="text-sm text-gray-500 hover:text-red-600"
+                          className="text-sm text-gray-500 hover:text-red-600 flex items-center"
                         >
+                          <HiTrash className="w-4 h-4 mr-1" />
                           Delete
                         </button>
                       </div>
@@ -311,9 +312,7 @@ export default function Notifications() {
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
+            <HiBell className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-800 mb-1">No notifications</h3>
           <p className="text-gray-500">You're all caught up! Check back later for updates.</p>

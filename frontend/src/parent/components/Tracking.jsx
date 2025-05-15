@@ -65,7 +65,7 @@ export default function Tracking() {
   }, [selectedChild]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6  md:pt-20">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Live Bus Tracking</h1>
         <div className="flex items-center">

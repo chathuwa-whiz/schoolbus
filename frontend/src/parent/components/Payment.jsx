@@ -59,15 +59,15 @@ export default function Payment() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="p-4 md:p-6"
+      className="p-4 md:p-6 md:pt-20"
     >
       <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+        {/* <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-800 mb-2 md:mb-0">Make a Payment</h1>
           <Link to="/parent/payments" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
             Back to Payments
           </Link>
-        </div>
+        </div> */}
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Payment Summary */}
