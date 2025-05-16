@@ -62,6 +62,12 @@ export const busApi = createApi({
                 method: 'DELETE'
             }),
             invalidatesTags: ['Bus']
+        }),
+        
+        // Get buses assigned to logged-in driver
+        getDriverBuses: builder.query({
+            query: () => '/buses/driver',
+            providesTags: ['Bus']
         })
     })
 });
@@ -72,5 +78,6 @@ export const {
     useGetBusByIdQuery,
     useCreateBusMutation,
     useUpdateBusMutation,
-    useDeleteBusMutation
+    useDeleteBusMutation,
+    useGetDriverBusesQuery
 } = busApi;

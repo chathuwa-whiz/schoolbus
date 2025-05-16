@@ -5,7 +5,8 @@ import {
   getBusById,
   createBus,
   updateBus,
-  deleteBus
+  deleteBus,
+  getDriverBuses
 } from '../controllers/BusController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -13,6 +14,9 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
+
+// Driver routes - specific routes must come before parameterized routes
+router.get('/driver', authorize('driver'), getDriverBuses);
 
 // Admin routes
 router.get('/', authorize('admin'), getAllBuses);

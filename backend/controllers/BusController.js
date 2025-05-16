@@ -251,3 +251,39 @@ export async function deleteBus(req, res) {
     });
   }
 }
+
+// Get buses assigned to the logged-in driver
+export async function getDriverBuses(req, res) {
+  try {
+    const driverId = req.user._id;
+    
+    // First check if driver has any buses directly assigned
+    let buses = await Bus.find({ driver: driverId }).sort({ busNumber: 1 });
+    
+    // If no buses directly assigned, check routes
+    if (buses.length === 0) {
+      // Get routes assigned to this driver
+      const routes = await Route.find({ driver: driverId, isActive: true });
+      
+      if (routes.length > 0) {
+        // Get unique bus IDs from routes
+        const busIds = [...new Set(routes.map(route => route.bus))].filter(Boolean);
+        
+        // Fetch buses using those IDs
+        buses = await Bus.find({ _id: { $in: busIds } }).sort({ busNumber: 1 });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      count: buses.length,
+      data: buses
+    });
+  } catch (error) {
+    console.error('Get driver buses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
