@@ -32,7 +32,8 @@ import DriverReports from './driver/components/Reports'
 import DriverSettings from './driver/components/Settings'
 
 // Admin components
-
+import AdminOverview from './admin/components/Overview'
+import AdminRoutes from './admin/components/Routes'
 
 export default function App() {
   return (
@@ -84,7 +85,8 @@ export default function App() {
             <AdminDashboardLayout />
           </ProtectedRoute>
         }>
-          <Route index element={<div>Admin Overview</div>} />
+          <Route index element={<AdminOverview />} />
+          <Route path="routes" element={<AdminRoutes />} />
         </Route>
         
         {/* Catch all route - 404 */}
