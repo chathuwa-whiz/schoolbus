@@ -1,6 +1,7 @@
 import Child from '../models/Child.js';
 import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
+import Route from '../models/Route.js';
 
 // Get attendance history for a specific child
 export async function getAttendanceHistory(req, res) {
@@ -455,6 +456,246 @@ export async function getRecentAttendance(req, res) {
     });
   } catch (error) {
     console.error('Get recent attendance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Add these functions to your AttendanceController
+
+// Get students for driver's routes
+export async function getDriverRouteStudents(req, res) {
+  try {
+    const driverId = req.user._id;
+    const { date, route } = req.query;
+    
+    // Get driver's assigned routes
+    const driverRoutes = await Route.find({ driver: driverId });
+    if (!driverRoutes.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No routes assigned to this driver'
+      });
+    }
+    
+    // Filter by specific route type if provided
+    const routeIds = route ? 
+      driverRoutes.filter(r => r.routeType === route).map(r => r._id) : 
+      driverRoutes.map(r => r._id);
+    
+    // Get children on these routes
+    const children = await Child.find({ route: { $in: routeIds } })
+      .populate('parent', 'firstName lastName phone')
+      .select('firstName lastName grade route pickupAddress dropoffAddress');
+    
+    // Get attendance records for the specified date
+    const targetDate = date ? new Date(date) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    
+    // Format children with attendance data
+    const formattedChildren = await Promise.all(children.map(async child => {
+      // Get child's attendance record for this day
+      const attendanceRecord = child.attendance?.find(a => 
+        new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
+      );
+      
+      return {
+        _id: child._id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        grade: child.grade,
+        routeId: child.route,
+        pickupAddress: child.pickupAddress,
+        dropoffAddress: child.dropoffAddress,
+        parentInfo: child.parent ? {
+          name: `${child.parent.firstName} ${child.parent.lastName}`,
+          phone: child.parent.phone
+        } : null,
+        parentReported: {
+          morning: attendanceRecord?.morningPickup?.status === 'expected',
+          afternoon: attendanceRecord?.afternoonDropoff?.status === 'expected'
+        },
+        status: {
+          morning: attendanceRecord?.morningPickup?.status === 'picked_up' ? 'picked_up' : 
+                  attendanceRecord?.morningPickup?.status === 'unavailable' ? 'absent' : null,
+          afternoon: attendanceRecord?.afternoonDropoff?.status === 'dropped_off' ? 'dropped_off' : 
+                    attendanceRecord?.afternoonDropoff?.status === 'unavailable' ? 'absent' : null
+        },
+        notes: attendanceRecord?.notes || '',
+        parentNote: attendanceRecord?.parentNote || ''
+      };
+    }));
+    
+    res.status(200).json({
+      success: true,
+      count: formattedChildren.length,
+      data: formattedChildren
+    });
+  } catch (error) {
+    console.error('Get driver route students error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Mark attendance status for a child
+export async function markAttendanceStatus(req, res) {
+  try {
+    const { childId } = req.params;
+    const { date, timeOfDay, status } = req.body;
+    const driverId = req.user._id;
+    
+    // Verify child is on driver's route
+    const child = await Child.findById(childId);
+    if (!child) {
+      return res.status(404).json({
+        success: false, 
+        message: 'Child not found'
+      });
+    }
+    
+    const childRoute = await Route.findOne({
+      _id: child.route,
+      driver: driverId
+    });
+    
+    if (!childRoute) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update attendance for this child'
+      });
+    }
+    
+    // Format the date
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    // Find or create attendance record
+    let attendanceRecord = child.attendance.find(a => 
+      new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
+    );
+    
+    if (!attendanceRecord) {
+      // Create new attendance record
+      child.attendance.push({
+        date: targetDate,
+        morningPickup: timeOfDay === 'morning' ? {
+          status: status === 'picked_up' ? 'picked_up' : 
+                 status === 'absent' ? 'unavailable' : 'expected',
+          time: status === 'picked_up' ? new Date() : null
+        } : undefined,
+        afternoonDropoff: timeOfDay === 'afternoon' ? {
+          status: status === 'dropped_off' ? 'dropped_off' : 
+                 status === 'absent' ? 'unavailable' : 'expected',
+          time: status === 'dropped_off' ? new Date() : null
+        } : undefined
+      });
+    } else {
+      // Update existing record
+      const index = child.attendance.findIndex(a => 
+        new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
+      );
+      
+      if (timeOfDay === 'morning') {
+        child.attendance[index].morningPickup = {
+          ...child.attendance[index].morningPickup,
+          status: status === 'picked_up' ? 'picked_up' : 
+                 status === 'absent' ? 'unavailable' : 'expected',
+          time: status === 'picked_up' ? new Date() : null
+        };
+      } else if (timeOfDay === 'afternoon') {
+        child.attendance[index].afternoonDropoff = {
+          ...child.attendance[index].afternoonDropoff,
+          status: status === 'dropped_off' ? 'dropped_off' : 
+                 status === 'absent' ? 'unavailable' : 'expected',
+          time: status === 'dropped_off' ? new Date() : null
+        };
+      }
+    }
+    
+    await child.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `Attendance status updated for ${child.firstName}`
+    });
+  } catch (error) {
+    console.error('Mark attendance status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Add attendance note for a child
+export async function addAttendanceNote(req, res) {
+  try {
+    const { childId } = req.params;
+    const { date, note } = req.body;
+    const driverId = req.user._id;
+    
+    // Verify child is on driver's route
+    const child = await Child.findById(childId);
+    if (!child) {
+      return res.status(404).json({
+        success: false, 
+        message: 'Child not found'
+      });
+    }
+    
+    const childRoute = await Route.findOne({
+      _id: child.route,
+      driver: driverId
+    });
+    
+    if (!childRoute) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to add notes for this child'
+      });
+    }
+    
+    // Format the date
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    // Find or create attendance record
+    let attendanceRecord = child.attendance.find(a => 
+      new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
+    );
+    
+    if (!attendanceRecord) {
+      // Create new attendance record with note
+      child.attendance.push({
+        date: targetDate,
+        notes: `[Driver note]: ${note}`
+      });
+    } else {
+      // Update existing record
+      const index = child.attendance.findIndex(a => 
+        new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
+      );
+      
+      // Add new note or append to existing notes
+      const existingNotes = child.attendance[index].notes || '';
+      child.attendance[index].notes = existingNotes ? 
+        `${existingNotes}\n[Driver note]: ${note}` : 
+        `[Driver note]: ${note}`;
+    }
+    
+    await child.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `Note added for ${child.firstName}`
+    });
+  } catch (error) {
+    console.error('Add attendance note error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

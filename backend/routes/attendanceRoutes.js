@@ -6,7 +6,10 @@ import {
   reportAbsence,
   updateDailyAttendance,
   sendDriverNote,
-  getRecentAttendance
+  getRecentAttendance,
+  getDriverRouteStudents,
+  markAttendanceStatus,
+  addAttendanceNote
 } from '../controllers/AttendanceController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -23,5 +26,10 @@ router.post('/child/:childId/report', authorize('parent'), reportAbsence);
 router.put('/child/:childId/daily', authorize('parent'), updateDailyAttendance);
 router.post('/child/:childId/note', authorize('parent'), sendDriverNote);
 router.get('/recent', authorize('parent'), getRecentAttendance);
+
+// Driver routes
+router.get('/driver/students', protect, authorize('driver'), getDriverRouteStudents);
+router.put('/driver/attendance/:childId', protect, authorize('driver'), markAttendanceStatus);
+router.post('/driver/attendance/:childId/note', protect, authorize('driver'), addAttendanceNote);
 
 export default router;

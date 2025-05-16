@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { 
-  HiUserCircle, 
-  HiChevronDown, 
-  HiOutlinePencil, 
-  HiCheck, 
-  HiClock,
-  HiHome,
-  HiExclamationCircle,
-  HiPlus
+  HiUserCircle, HiChevronDown, HiOutlinePencil, 
+  HiCheck, HiClock, HiHome, HiExclamationCircle, HiPlus
 } from 'react-icons/hi2';
 import { HiSearch, HiX } from 'react-icons/hi';
 import { TbBusStop } from 'react-icons/tb';
+import { 
+  useGetDriverRouteStudentsQuery,
+  useMarkAttendanceStatusMutation,
+  useAddAttendanceNoteMutation
+} from '../../redux/features/attendanceSlice';
+import Spinner from '../components/Spinner';
 
 export default function Attendance() {
   const [viewMode, setViewMode] = useState('today');
@@ -24,135 +24,115 @@ export default function Attendance() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [noteText, setNoteText] = useState('');
 
-  // Mock student data
-  const studentsData = [
-    { 
-      id: 1, 
-      name: "Alex Johnson", 
-      grade: "3rd", 
-      parentReported: { morning: true, afternoon: true },
-      status: { morning: null, afternoon: null }, // null = not marked yet, "picked_up", "dropped_off", "absent"
-      pickupTime: null,
-      pickupLocation: "52 Oak Street", 
-      dropoffTime: null,
-      dropoffLocation: "52 Oak Street", 
-      notes: "",
-      parentNote: "Might be a few minutes late today" 
-    },
-    { 
-      id: 2, 
-      name: "Emma Wilson", 
-      grade: "5th", 
-      parentReported: { morning: true, afternoon: true },
-      status: { morning: null, afternoon: null },
-      pickupTime: null,
-      pickupLocation: "108 Maple Avenue", 
-      dropoffTime: null,
-      dropoffLocation: "108 Maple Avenue", 
-      notes: "" 
-    },
-    { 
-      id: 3, 
-      name: "Jacob Smith", 
-      grade: "2nd", 
-      parentReported: { morning: false, afternoon: false },
-      status: { morning: "absent", afternoon: "absent" },
-      pickupTime: null,
-      pickupLocation: "221 Pine Road", 
-      dropoffTime: null,
-      dropoffLocation: "221 Pine Road", 
-      notes: "Parent notified absence - sick day" 
-    },
-    { 
-      id: 4, 
-      name: "Sophia Garcia", 
-      grade: "4th", 
-      parentReported: { morning: true, afternoon: true },
-      status: { morning: null, afternoon: null },
-      pickupTime: null,
-      pickupLocation: "221 Pine Road", 
-      dropoffTime: null,
-      dropoffLocation: "221 Pine Road", 
-      notes: "" 
-    },
-    { 
-      id: 5, 
-      name: "Michael Brown", 
-      grade: "1st", 
-      parentReported: { morning: true, afternoon: false },
-      status: { morning: null, afternoon: "absent" },
-      pickupTime: null,
-      pickupLocation: "15 Elm Drive", 
-      dropoffTime: null,
-      dropoffLocation: "15 Elm Drive", 
-      notes: "No afternoon dropoff needed - parent pickup from school" 
-    },
-    { 
-      id: 6, 
-      name: "Olivia Davis", 
-      grade: "KG", 
-      parentReported: { morning: false, afternoon: false },
-      status: { morning: "absent", afternoon: "absent" },
-      pickupTime: null,
-      pickupLocation: "52 Oak Street", 
-      dropoffTime: null,
-      dropoffLocation: "52 Oak Street", 
-      notes: "Sick day" 
+  // Format date for API queries
+  const formattedDate = currentDate.toISOString().split('T')[0];
+
+  // RTK Query hooks
+  const { 
+    data: studentsData, 
+    isLoading, 
+    isError, 
+    error, 
+    refetch 
+  } = useGetDriverRouteStudentsQuery({ 
+    date: formattedDate, 
+    route: selectedRoute === 'all' ? undefined : selectedRoute 
+  });
+
+  const [markAttendance, { isLoading: isMarkingAttendance }] = useMarkAttendanceStatusMutation();
+  const [addNote, { isLoading: isAddingNote }] = useAddAttendanceNoteMutation();
+
+  // Filter students based on search term
+  const filteredStudents = studentsData?.data?.length > 0 
+    ? studentsData.data.filter(student => 
+        student.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
+
+  const updateAttendanceStatus = async (childId, newStatus) => {
+    try {
+      const timeKey = selectedTimeOfDay;
+      await markAttendance({
+        childId,
+        data: {
+          date: formattedDate,
+          timeOfDay: timeKey,
+          status: newStatus
+        }
+      }).unwrap();
+      
+      const statusText = newStatus === "picked_up" ? "picked up" :
+                         newStatus === "dropped_off" ? "dropped off" : 
+                         newStatus === null ? "status reset" : "marked absent";
+                         
+      toast.success(`Student ${statusText} successfully`);
+      refetch();
+    } catch (err) {
+      toast.error(`Failed to update attendance: ${err.data?.message || 'Unknown error'}`);
     }
-  ];
-
-  // Filter students based on search, selected route, and time of day
-  const filteredStudents = studentsData.filter(student => 
-    student.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const updateAttendanceStatus = (id, newStatus) => {
-    // In a real application, this would update the status in your state and API
-    console.log(`Updating student ${id} ${selectedTimeOfDay} status to ${newStatus}`);
-    
-    // Update student status
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    // Show success message
-    const student = studentsData.find(s => s.id === id);
-    const action = newStatus === "picked_up" ? "picked up" :
-                   newStatus === "dropped_off" ? "dropped off" : "marked absent";
-    
-    toast.success(`${student.name} ${action} at ${timeNow}`);
   };
 
-  const handleAddNote = (id) => {
-    const student = studentsData.find(s => s.id === id);
+  const handleAddNote = (childId) => {
+    const student = filteredStudents.find(s => s._id === childId);
     setSelectedStudent(student);
-    setNoteText(student.notes);
+    setNoteText(student.notes || '');
     setShowNoteModal(true);
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!selectedStudent) return;
     
-    // In a real application, this would update the notes in your state and API
-    console.log(`Updating notes for student ${selectedStudent.id}: ${noteText}`);
-    
-    // Show success message
-    toast.success(`Note saved for ${selectedStudent.name}`);
-    
-    // Close modal
-    setShowNoteModal(false);
-    setSelectedStudent(null);
-    setNoteText('');
+    try {
+      await addNote({
+        childId: selectedStudent._id,
+        data: {
+          date: formattedDate,
+          note: noteText
+        }
+      }).unwrap();
+      
+      toast.success(`Note saved for ${selectedStudent.name}`);
+      refetch();
+      
+      // Close modal
+      setShowNoteModal(false);
+      setSelectedStudent(null);
+      setNoteText('');
+    } catch (err) {
+      toast.error(`Failed to save note: ${err.data?.message || 'Unknown error'}`);
+    }
   };
 
   // Get counts for the current time of day
   const getTodayCounts = () => {
+    if (!filteredStudents.length) {
+      return {
+        total: 0,
+        expected: 0,
+        notExpected: 0,
+        pickedUp: 0,
+        absent: 0,
+        pending: 0
+      };
+    }
+
     const timeKey = selectedTimeOfDay;
     const totalCount = filteredStudents.length;
-    const expectedCount = filteredStudents.filter(s => s.parentReported[timeKey]).length;
-    const notExpectedCount = filteredStudents.filter(s => !s.parentReported[timeKey]).length;
-    const pickedUpCount = filteredStudents.filter(s => 
-      s.status[timeKey] === "picked_up" || s.status[timeKey] === "dropped_off"
+    const expectedCount = filteredStudents.filter(s => 
+      s.parentReported && s.parentReported[timeKey]
     ).length;
-    const absentCount = filteredStudents.filter(s => s.status[timeKey] === "absent").length;
+    const notExpectedCount = filteredStudents.filter(s => 
+      s.parentReported && !s.parentReported[timeKey]
+    ).length;
+    
+    const pickedUpCount = filteredStudents.filter(s => 
+      s.status && (s.status[timeKey] === "picked_up" || s.status[timeKey] === "dropped_off")
+    ).length;
+    
+    const absentCount = filteredStudents.filter(s => 
+      s.status && s.status[timeKey] === "absent"
+    ).length;
+    
     const pendingCount = expectedCount - pickedUpCount - absentCount;
     
     return {
@@ -220,7 +200,7 @@ export default function Attendance() {
               <input 
                 type="date"
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                value={currentDate.toISOString().split('T')[0]}
+                value={formattedDate}
                 onChange={(e) => setCurrentDate(new Date(e.target.value))}
               />
             </div>
@@ -291,138 +271,169 @@ export default function Attendance() {
           </h2>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Reported</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {selectedTimeOfDay === 'morning' ? 'Pickup Location' : 'Dropoff Location'}
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredStudents.map((student) => {
-                const timeKey = selectedTimeOfDay;
-                const isExpected = student.parentReported[timeKey];
-                const currentStatus = student.status[timeKey];
-                
-                // Determine row background color
-                let rowClass = 'hover:bg-gray-50';
-                if (!isExpected) rowClass = 'bg-red-50';
-                else if (currentStatus === 'absent') rowClass = 'bg-gray-50';
-                
-                return (
-                  <tr key={student.id} className={rowClass}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center">
-                          {student.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.grade}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {student.parentReported[timeKey] ? (
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Available
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Not Available
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {currentStatus === null ? (
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          Not Marked
-                        </span>
-                      ) : currentStatus === "picked_up" || currentStatus === "dropped_off" ? (
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center">
-                          <HiCheck className="mr-1" />
-                          {currentStatus === "picked_up" ? "Picked Up" : "Dropped Off"}
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center">
-                          <HiX className="mr-1" />
-                          Absent
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {selectedTimeOfDay === 'morning' ? student.pickupLocation : student.dropoffLocation}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="max-w-xs truncate">
-                        {student.notes || (student.parentNote ? <span className="italic text-blue-600">{student.parentNote}</span> : "-")}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex space-x-2">
-                        {/* Different action buttons based on status */}
-                        {isExpected && currentStatus === null && (
-                          <>
-                            <button 
-                              onClick={() => updateAttendanceStatus(student.id, selectedTimeOfDay === 'morning' ? 'picked_up' : 'dropped_off')}
-                              className="px-3 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100 flex items-center"
-                            >
+        {isLoading ? (
+          <div className="p-20 flex justify-center">
+            <Spinner />
+          </div>
+        ) : isError ? (
+          <div className="p-6 text-center text-red-500">
+            <HiExclamationCircle className="w-12 h-12 mx-auto mb-4" />
+            <p>Error loading attendance data: {error?.data?.message || 'Unknown error'}</p>
+            <button 
+              onClick={refetch}
+              className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Reported</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {selectedTimeOfDay === 'morning' ? 'Pickup Location' : 'Dropoff Location'}
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredStudents.map((student) => {
+                    const timeKey = selectedTimeOfDay;
+                    const isExpected = student.parentReported?.[timeKey];
+                    const currentStatus = student.status?.[timeKey];
+                    
+                    // Determine row background color
+                    let rowClass = 'hover:bg-gray-50';
+                    if (!isExpected) rowClass = 'bg-red-50';
+                    else if (currentStatus === 'absent') rowClass = 'bg-gray-50';
+                    
+                    return (
+                      <tr key={student._id} className={rowClass}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center">
+                              {student.firstName && student.lastName ? 
+                                `${student.firstName[0]}${student.lastName[0]}` : 
+                                student.name?.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {student.firstName && student.lastName ? 
+                                  `${student.firstName} ${student.lastName}` : 
+                                  student.name}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {student.grade}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {student.parentReported?.[timeKey] ? (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Available
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              Not Available
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {currentStatus === null || currentStatus === undefined ? (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Not Marked
+                            </span>
+                          ) : currentStatus === "picked_up" || currentStatus === "dropped_off" ? (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center">
                               <HiCheck className="mr-1" />
-                              {selectedTimeOfDay === 'morning' ? 'Pick Up' : 'Drop Off'}
-                            </button>
-                            <button 
-                              onClick={() => updateAttendanceStatus(student.id, 'absent')}
-                              className="px-3 py-1 bg-red-50 text-red-700 rounded hover:bg-red-100 flex items-center"
-                            >
+                              {currentStatus === "picked_up" ? "Picked Up" : "Dropped Off"}
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 flex items-center">
                               <HiX className="mr-1" />
                               Absent
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {selectedTimeOfDay === 'morning' ? 
+                              student.pickupAddress?.street || 'Not specified' : 
+                              student.dropoffAddress?.street || 'Not specified'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="max-w-xs truncate">
+                            {student.notes || (student.parentNote ? <span className="italic text-blue-600">{student.parentNote}</span> : "-")}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex space-x-2">
+                            {/* Different action buttons based on status */}
+                            {isExpected && !currentStatus && (
+                              <>
+                                <button 
+                                  onClick={() => updateAttendanceStatus(student._id, selectedTimeOfDay === 'morning' ? 'picked_up' : 'dropped_off')}
+                                  className="px-3 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100 flex items-center"
+                                  disabled={isMarkingAttendance}
+                                >
+                                  <HiCheck className="mr-1" />
+                                  {selectedTimeOfDay === 'morning' ? 'Pick Up' : 'Drop Off'}
+                                </button>
+                                <button 
+                                  onClick={() => updateAttendanceStatus(student._id, 'absent')}
+                                  className="px-3 py-1 bg-red-50 text-red-700 rounded hover:bg-red-100 flex items-center"
+                                  disabled={isMarkingAttendance}
+                                >
+                                  <HiX className="mr-1" />
+                                  Absent
+                                </button>
+                              </>
+                            )}
+                            
+                            {currentStatus && (
+                              <button 
+                                onClick={() => updateAttendanceStatus(student._id, null)}
+                                className="px-3 py-1 bg-amber-50 text-amber-700 rounded hover:bg-amber-100 flex items-center"
+                                disabled={isMarkingAttendance}
+                              >
+                                <HiOutlinePencil className="mr-1" />
+                                Update
+                              </button>
+                            )}
+                            
+                            <button 
+                              onClick={() => handleAddNote(student._id)}
+                              className="px-3 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 flex items-center"
+                              disabled={isAddingNote}
+                            >
+                              <HiPlus className="mr-1" />
+                              Note
                             </button>
-                          </>
-                        )}
-                        
-                        {currentStatus && (
-                          <button 
-                            onClick={() => updateAttendanceStatus(student.id, null)}
-                            className="px-3 py-1 bg-amber-50 text-amber-700 rounded hover:bg-amber-100 flex items-center"
-                          >
-                            <HiOutlinePencil className="mr-1" />
-                            Update
-                          </button>
-                        )}
-                        
-                        <button 
-                          onClick={() => handleAddNote(student.id)}
-                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 flex items-center"
-                        >
-                          <HiPlus className="mr-1" />
-                          Note
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Empty state */}
-        {filteredStudents.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No students found matching your search.</p>
-          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Empty state */}
+            {filteredStudents.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No students found matching your search.</p>
+              </div>
+            )}
+          </>
         )}
       </motion.div>
       
@@ -431,7 +442,7 @@ export default function Attendance() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              Add Note for {selectedStudent.name}
+              Add Note for {selectedStudent.firstName} {selectedStudent.lastName}
             </h3>
             
             <textarea
@@ -446,14 +457,16 @@ export default function Attendance() {
               <button
                 onClick={() => setShowNoteModal(false)}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isAddingNote}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveNote}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                disabled={isAddingNote}
               >
-                Save Note
+                {isAddingNote ? 'Saving...' : 'Save Note'}
               </button>
             </div>
           </div>

@@ -12,7 +12,7 @@ export const attendanceApi = createApi({
       return headers;
     }
   }),
-  tagTypes: ['Attendance', 'ChildAttendance'],
+  tagTypes: ['Attendance', 'ChildAttendance', 'DriverAttendance'],
   endpoints: (builder) => ({
     // Get attendance history for a specific child
     getAttendanceHistory: builder.query({
@@ -79,7 +79,37 @@ export const attendanceApi = createApi({
     getRecentAttendance: builder.query({
       query: () => `/recent`,
       providesTags: ['Attendance']
-    })
+    }),
+
+    // Driver-specific endpoints
+    getDriverRouteStudents: builder.query({
+      query: ({ date, route }) => {
+        const params = new URLSearchParams();
+        if (date) params.append('date', date);
+        if (route) params.append('route', route);
+        
+        return `/driver/students?${params.toString()}`;
+      },
+      providesTags: ['DriverAttendance']
+    }),
+
+    markAttendanceStatus: builder.mutation({
+      query: ({ childId, data }) => ({
+        url: `/driver/attendance/${childId}`,
+        method: 'PUT',
+        body: data
+      }),
+      invalidatesTags: ['DriverAttendance']
+    }),
+
+    addAttendanceNote: builder.mutation({
+      query: ({ childId, data }) => ({
+        url: `/driver/attendance/${childId}/note`,
+        method: 'POST',
+        body: data
+      }),
+      invalidatesTags: ['DriverAttendance']
+    }),
   })
 });
 
@@ -90,5 +120,8 @@ export const {
   useUpdateDailyAttendanceMutation,
   useReportAbsenceMutation,
   useSendDriverNoteMutation,
-  useGetRecentAttendanceQuery
+  useGetRecentAttendanceQuery,
+  useGetDriverRouteStudentsQuery,
+  useMarkAttendanceStatusMutation,
+  useAddAttendanceNoteMutation
 } = attendanceApi;
