@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'motion/react';
+import { useSelector } from 'react-redux';
 import { 
   HiHome, 
   HiUserGroup, 
@@ -13,6 +14,8 @@ import {
 } from 'react-icons/hi2';
 
 export default function Sidebar({ isOpen, isMobile, closeSidebar }) {
+  const { user } = useSelector((state) => state.auth);
+  
   const navItems = [
     { path: "/driver", label: "Dashboard", icon: "home" },
     { path: "/driver/routes", label: "Routes & Students", icon: "user-group" },
@@ -45,8 +48,15 @@ export default function Sidebar({ isOpen, isMobile, closeSidebar }) {
     }
   };
 
+  // Determine if the sidebar should be visible
+  const sidebarClasses = `fixed top-0 left-0 z-30 h-full bg-white border-r border-gray-200 pt-16 w-64
+                        transform transition-transform duration-300 ease-in-out
+                        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+                        ${!isMobile ? 'md:translate-x-0' : ''}`;
+
   return (
     <>
+      {/* Overlay for mobile */}
       {isMobile && isOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-20" 
@@ -55,23 +65,19 @@ export default function Sidebar({ isOpen, isMobile, closeSidebar }) {
         ></div>
       )}
       
-      <motion.aside 
-        className={`fixed top-0 left-0 z-30 h-full bg-white border-r border-gray-200 pt-16 transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0 ${isMobile ? 'w-64' : 'w-64'}`}
-        initial={{ x: isMobile ? '-100%' : 0 }}
-        animate={{ x: isOpen ? 0 : (isMobile ? '-100%' : 0) }}
-        transition={{ duration: 0.3 }}
-      >
+      {/* Sidebar */}
+      <aside className={sidebarClasses}>
         <div className="px-4 py-6">
           <div className="mb-8">
             <div className="flex items-center mb-3 px-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-lg mr-3">
-                DD
+                {user?.firstName ? user.firstName.charAt(0) : 'D'}
               </div>
               <div>
-                <h2 className="font-semibold text-gray-800">David Driver</h2>
-                <p className="text-xs text-gray-500">driver@example.com</p>
+                <h2 className="font-semibold text-gray-800">
+                  {user?.firstName ? `${user.firstName} ${user.lastName}` : 'Driver Name'}
+                </h2>
+                <p className="text-xs text-gray-500">{user?.email || 'driver@example.com'}</p>
               </div>
             </div>
           </div>
@@ -112,7 +118,7 @@ export default function Sidebar({ isOpen, isMobile, closeSidebar }) {
             </button>
           </div>
         </div>
-      </motion.aside>
+      </aside>
     </>
   );
 }

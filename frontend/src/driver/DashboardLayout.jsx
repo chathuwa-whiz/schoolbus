@@ -21,6 +21,7 @@ export default function DashboardLayout() {
     };
 
     window.addEventListener('resize', handleResize);
+    // Initial check
     handleResize();
 
     return () => window.removeEventListener('resize', handleResize);
@@ -33,9 +34,14 @@ export default function DashboardLayout() {
     }
   }, [location.pathname, isMobile]);
 
+  // Toggle sidebar function
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Navbar toggleSidebar={toggleSidebar} />
       
       <div className="flex">
         <Sidebar 

@@ -28,9 +28,10 @@ export default function Navbar({ toggleSidebar }) {
     <nav className="bg-white border-b border-gray-200 fixed w-full z-40">
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
+          {/* Hamburger icon - ONLY visible on mobile */}
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none md:mr-6"
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none md:hidden"
           >
             <HiBars3 className="h-6 w-6" />
           </button>
@@ -107,12 +108,6 @@ export default function Navbar({ toggleSidebar }) {
             
             {showDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-10 border border-gray-200">
-                {/* <Link
-                  to="/driver/profile"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Your Profile
-                </Link> */}
                 <Link
                   to="/driver/settings"
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
