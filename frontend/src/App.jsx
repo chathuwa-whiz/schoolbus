@@ -14,9 +14,10 @@ import Overview from './parent/components/Overview'
 import Children from './parent/components/Children'
 import Tracking from './parent/components/Tracking'
 import AttendanceHistory from './parent/components/AttendanceHistory'
-import Payments from './parent/components/Payment'
 import Notifications from './parent/components/Notifications'
 import Settings from './parent/components/Settings'
+import Invoices from './parent/components/Invoices'
+import Payment from './parent/components/Payment'
 
 // Driver components
 import DriverOverview from './driver/components/Overview'
@@ -48,7 +49,8 @@ export default function App() {
           <Route path="children" element={<Children />} />
           <Route path="tracking" element={<Tracking />} />
           <Route path="attendance" element={<AttendanceHistory />} />
-          <Route path="payments" element={<Payments />} />
+          <Route path="payments" element={<Invoices />} />
+          <Route path="payments/:invoiceId" element={<Payment />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
         </Route>

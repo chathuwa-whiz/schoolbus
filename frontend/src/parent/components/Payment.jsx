@@ -1,58 +1,138 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { toast } from 'react-hot-toast'
+import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { PayPalButton } from 'react-paypal-button-v2'
+import StripeConfig from '../../utils/StripeConfig'
+import { 
+  useGetInvoiceDetailsQuery,
+  useProcessCardPaymentMutation,
+  useCreatePaypalOrderMutation,
+  useCapturePaypalOrderMutation
+} from '../../redux/features/paymentSlice'
+import Spinner from './Spinner'
 
-export default function Payment() {
+function PaymentForm() {
+  const { invoiceId } = useParams();
+  const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('creditCard');
-  const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cardError, setCardError] = useState(null);
   
-  const paymentDetails = {
-    invoiceId: "INV-2023-08",
-    dueDate: "August 1, 2023",
-    amount: 85.00,
-    description: "Monthly school bus service fee",
-    period: "August 2023",
-    children: [
-      { name: "Emma Parent", busRoute: "Route #12", fee: 45.00 },
-      { name: "Jacob Parent", busRoute: "Route #15", fee: 40.00 }
-    ]
+  // Skip fetching if invoiceId is not valid
+  const skipQuery = !invoiceId || invoiceId === 'undefined';
+  
+  // RTK Query hooks
+  const { data: paymentDetails, isLoading, error } = useGetInvoiceDetailsQuery(
+    invoiceId, 
+    { skip: skipQuery }
+  );
+  
+  const [processCardPayment] = useProcessCardPaymentMutation();
+  const [createPaypalOrder] = useCreatePaypalOrderMutation();
+  const [capturePaypalOrder] = useCapturePaypalOrderMutation();
+  
+  // If no valid invoiceId, redirect to invoices list
+  useEffect(() => {
+    if (skipQuery) {
+      navigate('/parent/payments');
+    }
+  }, [skipQuery, navigate]);
+  
+  // Stripe hooks
+  const stripe = useStripe();
+  const elements = useElements();
+  
+  const handleCardSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!stripe || !elements) {
+      return;
+    }
+    
+    setIsProcessing(true);
+    setCardError(null);
+    
+    const cardElement = elements.getElement(CardElement);
+    
+    try {
+      // Create payment method
+      const { error, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: cardName
+        }
+      });
+      
+      if (error) {
+        setCardError(error.message);
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Process payment
+      const result = await processCardPayment({
+        invoiceId,
+        paymentMethodId: paymentMethod.id,
+        amount: paymentDetails.amount
+      }).unwrap();
+      
+      toast.success('Payment processed successfully!');
+      navigate('/parent/payments/receipt/' + result.receiptId);
+    } catch (err) {
+      toast.error('Payment failed: ' + (err.data?.message || 'Unknown error'));
+    } finally {
+      setIsProcessing(false);
+    }
   };
   
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  // PayPal handlers
+  const createPayPalOrder = async () => {
+    try {
+      const result = await createPaypalOrder({
+        invoiceId,
+        amount: paymentDetails.amount
+      }).unwrap();
+      
+      return result.orderId;
+    } catch (err) {
+      toast.error('Failed to create PayPal order');
+      return null;
+    }
+  };
+  
+  const onPayPalApprove = async (data) => {
     setIsProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      const result = await capturePaypalOrder({
+        invoiceId,
+        orderId: data.orderID
+      }).unwrap();
+      
       toast.success('Payment processed successfully!');
-      // In a real app, you would redirect to a receipt page or show a receipt modal
-    }, 2000);
-  };
-  
-  const formatCardNumber = (value) => {
-    // Remove all non-digits
-    const digits = value.replace(/\D/g, '');
-    // Add space after every 4 digits
-    const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ');
-    // Limit to 19 characters (16 digits + 3 spaces)
-    return formatted.substring(0, 19);
-  };
-  
-  const formatExpiryDate = (value) => {
-    // Remove all non-digits
-    const digits = value.replace(/\D/g, '');
-    // Add slash after first 2 digits
-    if (digits.length > 2) {
-      return digits.substring(0, 2) + '/' + digits.substring(2, 4);
+      navigate('/parent/payments/receipt/' + result.receiptId);
+    } catch (err) {
+      toast.error('Payment capture failed: ' + (err.data?.message || 'Unknown error'));
+    } finally {
+      setIsProcessing(false);
     }
-    return digits;
   };
+  
+  if (isLoading) {
+    return <Spinner />;
+  }
+  
+  if (error) {
+    return (
+      <div className="md:p-20 bg-red-50 text-red-700 rounded-lg">
+        Error loading payment details: {error.data?.message || 'Unknown error'}
+      </div>
+    );
+  }
 
   return (
     <motion.div 
@@ -62,13 +142,6 @@ export default function Payment() {
       className="p-4 md:p-6 md:pt-20"
     >
       <div className="max-w-4xl mx-auto">
-        {/* <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2 md:mb-0">Make a Payment</h1>
-          <Link to="/parent/payments" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-            Back to Payments
-          </Link>
-        </div> */}
-        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Payment Summary */}
           <div className="md:col-span-1 order-2 md:order-1">
@@ -110,7 +183,7 @@ export default function Payment() {
                 <div className="bg-gray-50 p-4 -mx-5 -mb-5 mt-6">
                   <div className="text-center text-sm text-gray-600">
                     <p>Need help with your payment?</p>
-                    <Link to="/contact" className="text-indigo-600 hover:text-indigo-800 font-medium">
+                    <Link to="/parent/support" className="text-indigo-600 hover:text-indigo-800 font-medium">
                       Contact support
                     </Link>
                   </div>
@@ -144,7 +217,6 @@ export default function Payment() {
                             <rect width="40" height="24" rx="4" fill="#E7E9EC"/>
                             <path fillRule="evenodd" clipRule="evenodd" d="M15.5152 17.0522H12.4848L10.5455 9.14775C10.4605 8.80543 10.2803 8.50444 10.0332 8.29391C9.28788 7.74141 8.45455 7.28023 7.53033 6.94775V6.70456H12.2803C12.9495 6.70456 13.4545 7.18891 13.5455 7.78023L14.4242 13.4711L16.697 6.70456H19.5909L15.5152 17.0522ZM20.8636 17.0522H18.0606L20.3788 6.70456H23.1818L20.8636 17.0522ZM25.7576 9.86647C25.8485 9.26647 26.3535 8.9098 26.9394 8.9098C27.8182 8.82316 28.7879 9.02499 29.5758 9.50934L30.0303 7.04142C29.2424 6.70895 28.3636 6.54159 27.5758 6.54159C24.9697 6.54159 23.0303 7.95026 23.0303 9.92982C23.0303 11.4271 24.3333 12.1855 25.303 12.6189C26.2727 13.0523 26.6667 13.3189 26.5758 13.7523C26.5758 14.418 25.8485 14.7271 25.1212 14.7271C24.1515 14.7271 23.1818 14.418 22.3939 13.9189L21.9394 16.386C22.8182 16.8189 23.7879 16.9855 24.697 16.9855C27.5758 16.9855 29.4242 15.5855 29.4242 13.4814C29.4242 10.8189 25.7576 10.6855 25.7576 9.86647ZM36.4545 17.0522L34.1818 6.70456H31.6667C31.1212 6.70456 30.6163 7.02835 30.4545 7.53086L26.3787 17.0522H29.2728L29.8182 15.4948H33.3333L33.6364 17.0522H36.4545ZM32.0303 9.14775L32.8182 13.2836H30.5L32.0303 9.14775Z" fill="#1A1A1A"/>
                           </svg>
-                          {/* Other card icons here */}
                         </div>
                       </div>
                     </div>
@@ -170,7 +242,7 @@ export default function Payment() {
                 </div>
                 
                 {paymentMethod === 'creditCard' ? (
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleCardSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label htmlFor="cardName" className="block text-sm font-medium text-gray-700 mb-1">
@@ -188,61 +260,39 @@ export default function Payment() {
                       </div>
                       
                       <div>
-                        <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                          Card Number
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Card Details
                         </label>
-                        <input
-                          id="cardNumber"
-                          type="text"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                          placeholder="1234 5678 9012 3456"
-                          maxLength={19}
-                          required
-                        />
+                        <div className="border border-gray-300 rounded-lg p-3">
+                          <CardElement 
+                            options={{
+                              style: {
+                                base: {
+                                  fontSize: '16px',
+                                  color: '#424770',
+                                  '::placeholder': {
+                                    color: '#aab7c4',
+                                  },
+                                },
+                                invalid: {
+                                  color: '#9e2146',
+                                },
+                              },
+                            }}
+                          />
+                        </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-700 mb-1">
-                            Expiry Date
-                          </label>
-                          <input
-                            id="expiryDate"
-                            type="text"
-                            value={expiryDate}
-                            onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                            placeholder="MM/YY"
-                            maxLength={5}
-                            required
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">
-                            CVV
-                          </label>
-                          <input
-                            id="cvv"
-                            type="text"
-                            value={cvv}
-                            onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 3))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                            placeholder="123"
-                            maxLength={3}
-                            required
-                          />
-                        </div>
-                      </div>
+                      {cardError && (
+                        <div className="text-red-500 text-sm">{cardError}</div>
+                      )}
                     </div>
                     
                     <div className="pt-4">
                       <button
                         type="submit"
-                        disabled={isProcessing}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition duration-300 flex justify-center items-center"
+                        disabled={isProcessing || !stripe}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition duration-300 flex justify-center items-center disabled:bg-indigo-300"
                       >
                         {isProcessing ? (
                           <>
@@ -258,26 +308,19 @@ export default function Payment() {
                   </form>
                 ) : (
                   <div className="text-center p-6">
-                    <p className="mb-4 text-gray-600">You will be redirected to PayPal to complete your payment.</p>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={isProcessing}
-                      className="bg-[#0070BA] hover:bg-[#005ea6] text-white py-3 px-6 rounded-lg font-medium transition duration-300 flex justify-center items-center mx-auto"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Redirecting...
-                        </>
-                      ) : (
-                        <>
-                          Proceed to PayPal
-                        </>
-                      )}
-                    </button>
+                    <p className="mb-4 text-gray-600">Complete your payment with PayPal.</p>
+                    <div className="px-8">
+                      <PayPalButton
+                        createOrder={createPayPalOrder}
+                        onApprove={onPayPalApprove}
+                        onError={() => toast.error("PayPal payment failed")}
+                        options={{
+                          clientId: "YOUR_PAYPAL_CLIENT_ID",
+                          currency: "USD",
+                          disableFunding: "card"
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
                 
@@ -308,4 +351,13 @@ export default function Payment() {
       </div>
     </motion.div>
   )
+}
+
+// Wrap the component with Stripe configuration
+export default function Payment() {
+  return (
+    <StripeConfig>
+      <PaymentForm />
+    </StripeConfig>
+  );
 }
