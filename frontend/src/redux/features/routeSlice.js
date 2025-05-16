@@ -95,6 +95,12 @@ export const routeApi = createApi({
         getAvailableDrivers: builder.query({
             query: () => '/users/drivers',
             providesTags: ['Driver']
+        }),
+        
+        // Get routes assigned to a driver
+        getDriverRoutes: builder.query({
+            query: (driverId) => `/routes/driver/${driverId}`,
+            providesTags: ['Route']
         })
     })
 });
@@ -108,5 +114,6 @@ export const {
     useDeleteRouteMutation,
     useAssignDriverToRouteMutation,
     useUnassignDriverFromRouteMutation,
-    useGetAvailableDriversQuery
+    useGetAvailableDriversQuery,
+    useGetDriverRoutesQuery
 } = routeApi;

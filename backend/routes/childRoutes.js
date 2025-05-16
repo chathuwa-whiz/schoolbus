@@ -5,7 +5,8 @@ import {
   createChild, 
   updateChild, 
   deleteChild, 
-  updateChildAttendance 
+  updateChildAttendance,
+  getRouteChildren
 } from '../controllers/ChildController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -21,5 +22,8 @@ router.post('/', authorize('parent'), createChild);
 router.put('/:id', authorize('parent'), updateChild);
 router.delete('/:id', authorize('parent'), deleteChild);
 router.put('/:id/attendance', authorize('parent'), updateChildAttendance);
+
+// Get children assigned to a specific route
+router.get('/route/:routeId', protect, authorize('driver', 'admin'), getRouteChildren);
 
 export default router;

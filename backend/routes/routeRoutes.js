@@ -7,7 +7,8 @@ import {
   updateRoute,
   deleteRoute,
   assignDriverToRoute,
-  unassignDriverFromRoute
+  unassignDriverFromRoute,
+  getDriverRoutes
 } from '../controllers/RouteController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -27,5 +28,8 @@ router.put('/:id', authorize('admin'), updateRoute);
 router.delete('/:id', authorize('admin'), deleteRoute);
 router.patch('/:routeId/assign-driver', authorize('admin'), assignDriverToRoute);
 router.patch('/:routeId/unassign-driver', authorize('admin'), unassignDriverFromRoute);
+
+// Get routes assigned to a driver
+router.get('/driver/:driverId', authorize('driver', 'admin'), getDriverRoutes);
 
 export default router;

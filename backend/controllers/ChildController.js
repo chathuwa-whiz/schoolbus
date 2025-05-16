@@ -1,4 +1,5 @@
 import Child from '../models/Child.js';
+import Route from '../models/Route.js';
 
 // Get all children for the logged-in parent
 export async function getChildren(req, res) {
@@ -252,6 +253,47 @@ export async function updateChildAttendance(req, res) {
     });
   } catch (error) {
     console.error('Update attendance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Get children assigned to a specific route
+export async function getRouteChildren(req, res) {
+  try {
+    const { routeId } = req.params;
+    
+    // Check if route exists
+    const route = await Route.findById(routeId);
+    if (!route) {
+      return res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+    }
+    
+    // If user is a driver, ensure they are assigned to this route
+    if (req.user.role === 'driver' && route.driver.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this route'
+      });
+    }
+    
+    // Get all children assigned to this route
+    const children = await Child.find({ route: routeId })
+      .populate('parent', 'firstName lastName email phone')
+      .sort({ firstName: 1, lastName: 1 });
+    
+    res.status(200).json({
+      success: true,
+      count: children.length,
+      data: children
+    });
+  } catch (error) {
+    console.error('Get route children error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

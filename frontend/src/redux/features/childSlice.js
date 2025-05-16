@@ -12,7 +12,7 @@ export const childApi = createApi({
             return headers;
         }
     }),
-    tagTypes: ['Child'],
+    tagTypes: ['Child', 'RouteStudents'],
     endpoints: (builder) => ({
         // Get all children for parent
         getChildren: builder.query({
@@ -69,6 +69,14 @@ export const childApi = createApi({
                 { type: 'Child', id }, 
                 'Child'
             ]
+        }),
+        
+        // Get students assigned to a specific route
+        getRouteStudents: builder.query({
+            query: (routeId) => `/children/route/${routeId}`,
+            providesTags: (result, error, routeId) => [
+                { type: 'RouteStudents', id: routeId }
+            ]
         })
     })
 });
@@ -79,5 +87,6 @@ export const {
     useCreateChildMutation, 
     useUpdateChildMutation, 
     useDeleteChildMutation,
-    useUpdateChildAttendanceMutation
+    useUpdateChildAttendanceMutation,
+    useGetRouteStudentsQuery
 } = childApi;

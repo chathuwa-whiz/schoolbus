@@ -302,3 +302,43 @@ export async function deleteRoute(req, res) {
     });
   }
 }
+
+// Get routes assigned to a driver
+export async function getDriverRoutes(req, res) {
+  try {
+    const { driverId } = req.params;
+    
+    // Check if this is the authenticated driver or an admin
+    if (req.user.role === 'driver' && req.user._id.toString() !== driverId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to access other driver routes'
+      });
+    }
+    
+    // Find driver to check if they exist
+    const driver = await User.findById(driverId);
+    if (!driver || driver.role !== 'driver') {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found'
+      });
+    }
+    
+    // Get routes assigned to this driver
+    const routes = await Route.find({ driver: driverId })
+      .sort({ type: 1, name: 1 });
+    
+    res.status(200).json({
+      success: true,
+      count: routes.length,
+      data: routes
+    });
+  } catch (error) {
+    console.error('Get driver routes error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
