@@ -313,44 +313,89 @@ export async function getChildBusTracking(req, res) {
     if (!child) {
       return res.status(404).json({
         success: false,
-        message: 'Child not found'
+        message: 'Child not found or not authorized'
       });
     }
 
-    // Get the bus associated with the child's route
-    const route = await Route.findById(child.route);
-    if (!route || !route.bus) {
+    // If child doesn't have a route assigned
+    if (!child.route) {
+      return res.status(404).json({
+        success: false,
+        message: 'No route assigned to this child'
+      });
+    }
+
+    // Get the route and associated bus
+    const route = await Route.findById(child.route)
+      .populate('driver', 'firstName lastName phone');
+    
+    if (!route) {
+      return res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+    }
+
+    if (!route.bus) {
       return res.status(404).json({
         success: false,
         message: 'No bus assigned to the child\'s route'
       });
     }
 
-    // Get tracking for the bus
+    // Get bus details
+    const bus = await Bus.findById(route.bus);
+    if (!bus) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bus not found'
+      });
+    }
+
+    // Get active tracking for the bus
     const tracking = await Tracking.findOne({
       busId: route.bus,
       isActive: true,
       dateActive: {
         $gte: new Date().setHours(0, 0, 0, 0)
       }
-    })
-    .populate('busId', 'busNumber capacity')
-    .populate('driverId', 'firstName lastName phone');
+    }).populate('driverId', 'firstName lastName phone');
 
+    // If no active tracking found, return what we know about the route/bus
     if (!tracking) {
-      return res.status(404).json({
-        success: false,
-        message: 'No active tracking found for this bus'
+      return res.status(200).json({
+        success: true,
+        message: 'No active tracking for this bus at the moment',
+        data: {
+          isActive: false,
+          dayHistory: []
+        },
+        childInfo: {
+          name: `${child.firstName} ${child.lastName}`,
+          busNumber: `Bus #${bus.busNumber}`,
+          routeInfo: {
+            name: route.name,
+            type: route.type
+          },
+          driverInfo: route.driver ? {
+            name: `${route.driver.firstName} ${route.driver.lastName}`,
+            phone: route.driver.phone
+          } : null
+        }
       });
     }
 
+    // Return full tracking data if available
     res.status(200).json({
       success: true,
       data: tracking,
       childInfo: {
         name: `${child.firstName} ${child.lastName}`,
-        busNumber: tracking.busId.busNumber,
-        routeInfo: route
+        busNumber: `Bus #${bus.busNumber}`,
+        routeInfo: {
+          name: route.name,
+          type: route.type
+        }
       }
     });
   } catch (error) {
@@ -367,9 +412,14 @@ export async function getBusTrackingHistory(req, res) {
   try {
     const { busId, date } = req.params;
     
-    const targetDate = date ? new Date(date) : new Date();
-    const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999));
+    // If date is not provided, use today's date
+    const queryDate = date || new Date().toISOString().split('T')[0];
+    
+    const targetDate = new Date(queryDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const startOfDay = targetDate;
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
     const tracking = await Tracking.find({
       busId,
