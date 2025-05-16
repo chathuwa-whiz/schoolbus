@@ -1,5 +1,6 @@
 import Child from '../models/Child.js';
 import Route from '../models/Route.js';
+import User from '../models/User.js';
 
 // Get all children for the logged-in parent
 export async function getChildren(req, res) {
@@ -97,6 +98,13 @@ export async function createChild(req, res) {
     // Create the child
     const child = await Child.create(childData);
 
+    // Update the parent's children array with this child's ID
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { children: child._id } },
+      { new: true }
+    );
+
     res.status(201).json({
       success: true,
       data: child
@@ -187,7 +195,14 @@ export async function deleteChild(req, res) {
       });
     }
     
+    // Remove child from database
     await Child.findByIdAndDelete(childId);
+    
+    // Remove child reference from parent's children array
+    await User.findByIdAndUpdate(
+      parentId,
+      { $pull: { children: childId } }
+    );
     
     res.status(200).json({
       success: true,
