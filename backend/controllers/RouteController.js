@@ -82,6 +82,12 @@ export async function assignDriverToRoute(req, res) {
     route.isActive = true;
     await route.save();
 
+    // Add this route to the driver's routes array if not already there
+    if (!driver.routes.includes(routeId)) {
+      driver.routes.push(routeId);
+      await driver.save();
+    }
+
     res.status(200).json({
       success: true,
       message: 'Driver assigned to route successfully',
@@ -108,6 +114,15 @@ export async function unassignDriverFromRoute(req, res) {
         success: false,
         message: 'Route not found'
       });
+    }
+
+    // If there's a driver assigned, remove the route from their routes array
+    if (route.driver) {
+      const driver = await User.findById(route.driver);
+      if (driver) {
+        driver.routes = driver.routes.filter(r => r.toString() !== routeId.toString());
+        await driver.save();
+      }
     }
 
     // Update the route to remove the driver
