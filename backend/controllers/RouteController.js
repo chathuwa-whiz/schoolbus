@@ -157,7 +157,7 @@ export async function createRoute(req, res) {
   try {
     const { 
       name, routeNumber, type, school, description, 
-      stops, startDate, isActive, driver 
+      stops, startDate, isActive, driver, bus 
     } = req.body;
 
     // Validate required fields
@@ -185,6 +185,7 @@ export async function createRoute(req, res) {
       school,
       description,
       stops,
+      bus,
       startDate: startDate || new Date(),
       isActive: isActive !== undefined ? isActive : true,
       driver: driver || null

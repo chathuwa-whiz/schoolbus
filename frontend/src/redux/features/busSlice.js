@@ -24,11 +24,53 @@ export const busApi = createApi({
         getAvailableBuses: builder.query({
             query: () => '/buses/available',
             providesTags: ['Bus']
+        }),
+
+        // Get bus by ID
+        getBusById: builder.query({
+            query: (id) => `/buses/${id}`,
+            providesTags: (result, error, id) => [{ type: 'Bus', id }]
+        }),
+        
+        // Create new bus
+        createBus: builder.mutation({
+            query: (busData) => ({
+                url: '/buses',
+                method: 'POST',
+                body: busData
+            }),
+            invalidatesTags: ['Bus']
+        }),
+        
+        // Update bus
+        updateBus: builder.mutation({
+            query: ({ id, busData }) => ({
+                url: `/buses/${id}`,
+                method: 'PUT',
+                body: busData
+            }),
+            invalidatesTags: (result, error, { id }) => [
+                { type: 'Bus', id },
+                'Bus'
+            ]
+        }),
+        
+        // Delete bus
+        deleteBus: builder.mutation({
+            query: (id) => ({
+                url: `/buses/${id}`,
+                method: 'DELETE'
+            }),
+            invalidatesTags: ['Bus']
         })
     })
 });
 
 export const { 
     useGetAllBusesQuery,
-    useGetAvailableBusesQuery
+    useGetAvailableBusesQuery,
+    useGetBusByIdQuery,
+    useCreateBusMutation,
+    useUpdateBusMutation,
+    useDeleteBusMutation
 } = busApi;

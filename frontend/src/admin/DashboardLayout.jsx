@@ -54,8 +54,6 @@ export default function DashboardLayout() {
     { name: 'Users', href: '/admin/users', icon: HiUsers },
     { name: 'Vehicles', href: '/admin/vehicles', icon: HiTruck },
     { name: 'Routes', href: '/admin/routes', icon: HiMap },
-    { name: 'Attendance', href: '/admin/attendance', icon: HiClipboardList },
-    { name: 'Payments', href: '/admin/payments', icon: HiCreditCard },
     { name: 'Reports', href: '/admin/reports', icon: HiChartBar },
     { name: 'Settings', href: '/admin/settings', icon: HiCog }
   ];

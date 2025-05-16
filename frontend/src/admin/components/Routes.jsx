@@ -259,14 +259,14 @@ export default function Routes() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
-                            <button 
+                            {/* <button 
                               className="text-blue-600 hover:text-blue-900"
                               onClick={() => {
                                 // Navigate to edit route page or show edit modal
                               }}
                             >
                               <HiPencil className="h-5 w-5" />
-                            </button>
+                            </button> */}
                             {route.driver && (
                               <button 
                                 onClick={() => handleUnassignDriver(route._id)}

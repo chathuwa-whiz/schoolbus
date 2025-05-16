@@ -25,7 +25,7 @@ router.get('/', authorize('admin'), getAllRoutes);
 router.post('/', authorize('admin'), createRoute);
 router.put('/:id', authorize('admin'), updateRoute);
 router.delete('/:id', authorize('admin'), deleteRoute);
-router.patch('/:id/assign-driver', authorize('admin'), assignDriverToRoute);
-router.patch('/:id/unassign-driver', authorize('admin'), unassignDriverFromRoute);
+router.patch('/:routeId/assign-driver', authorize('admin'), assignDriverToRoute);
+router.patch('/:routeId/unassign-driver', authorize('admin'), unassignDriverFromRoute);
 
 export default router;
