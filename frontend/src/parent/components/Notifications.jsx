@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { motion } from 'motion/react'
-import { toast } from 'react-hot-toast'
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
+import { toast } from 'react-hot-toast';
 import { 
   HiCheck, 
   HiArrowDown, 
@@ -11,78 +11,55 @@ import {
   HiBell,
   HiTrash,
   HiCheckCircle
-} from 'react-icons/hi2'
+} from 'react-icons/hi2';
+import {
+  useGetNotificationsQuery,
+  useMarkAsReadMutation,
+  useMarkAllAsReadMutation,
+  useDeleteNotificationMutation,
+  useClearAllNotificationsMutation,
+  useUpdatePreferencesMutation
+} from '../../redux/features/notificationSlice';
+import Spinner from './Spinner';
 
 export default function Notifications() {
-  // In a real application, these would come from an API
-  const [notifications, setNotifications] = useState([
-    { 
-      id: 1, 
-      type: 'pickup', 
-      title: 'Morning Pickup',
-      message: 'Sarah was picked up at 7:15 AM',  
-      time: '2023-03-15T07:15:00',
-      isRead: false,
-      date: 'Today'
-    },
-    { 
-      id: 2, 
-      type: 'dropoff', 
-      title: 'School Drop-off',
-      message: 'Sarah was dropped off at school at 7:45 AM', 
-      time: '2023-03-15T07:45:00',
-      isRead: false,
-      date: 'Today'
-    },
-    { 
-      id: 3, 
-      type: 'payment', 
-      title: 'Payment Reminder',
-      message: 'Monthly transportation fee ($75) is due in 3 days', 
-      time: '2023-03-15T08:00:00',
-      isRead: true,
-      date: 'Today'
-    },
-    { 
-      id: 4, 
-      type: 'delay', 
-      title: 'Bus Delay Alert',
-      message: 'Afternoon bus is running 10 minutes late due to traffic', 
-      time: '2023-03-15T14:30:00',
-      isRead: false,
-      date: 'Today'
-    },
-    { 
-      id: 5, 
-      type: 'pickup', 
-      title: 'Afternoon Pickup',
-      message: 'Sarah was picked up from school at 3:15 PM', 
-      time: '2023-03-14T15:15:00',
-      isRead: true,
-      date: 'Yesterday'
-    },
-    { 
-      id: 6, 
-      type: 'dropoff', 
-      title: 'Home Drop-off',
-      message: 'Sarah was dropped off at home at 3:45 PM', 
-      time: '2023-03-14T15:45:00',
-      isRead: true,
-      date: 'Yesterday'
-    },
-    { 
-      id: 7, 
-      type: 'system', 
-      title: 'System Update',
-      message: 'We\'ve updated the tracking system with improved accuracy', 
-      time: '2023-03-13T09:00:00',
-      isRead: true,
-      date: 'Mar 13, 2023'
-    },
-  ]);
-
   const [activeFilter, setActiveFilter] = useState('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [preferences, setPreferences] = useState({
+    pickup_dropoff: true,
+    delays: true,
+    payment: true,
+    system: true
+  });
+
+  // Fetch notifications data
+  const { 
+    data: notificationsData, 
+    isLoading, 
+    isError, 
+    error 
+  } = useGetNotificationsQuery();
+
+  // RTK Query mutation hooks
+  const [markAsRead] = useMarkAsReadMutation();
+  const [markAllAsRead] = useMarkAllAsReadMutation();
+  const [deleteNotification] = useDeleteNotificationMutation();
+  const [clearAllNotifications] = useClearAllNotificationsMutation();
+  const [updatePreferences] = useUpdatePreferencesMutation();
+
+  // Fetch user preferences
+  useEffect(() => {
+    if (notificationsData?.preferences) {
+      setPreferences(notificationsData.preferences);
+    }
+  }, [notificationsData]);
+
+  // Show error toast if fetch fails
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.data?.message || 'Failed to load notifications');
+    }
+  }, [isError, error]);
 
   const notificationFilters = [
     { id: 'all', label: 'All' },
@@ -93,50 +70,123 @@ export default function Notifications() {
     { id: 'system', label: 'System' },
   ];
 
-  const markAsRead = (id) => {
-    setNotifications(
-      notifications.map(notification => 
-        notification.id === id 
-          ? { ...notification, isRead: true } 
-          : notification
-      )
-    );
+  // Handle marking a notification as read
+  const handleMarkAsRead = async (id) => {
+    try {
+      await markAsRead(id).unwrap();
+      toast.success('Notification marked as read');
+    } catch (error) {
+      toast.error('Failed to mark notification as read');
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(
-      notifications.map(notification => ({ ...notification, isRead: true }))
-    );
-    toast.success('All notifications marked as read');
+  // Handle mark all as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead().unwrap();
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      toast.error('Failed to mark all as read');
+    }
   };
 
-  const deleteNotification = (id) => {
-    setNotifications(
-      notifications.filter(notification => notification.id !== id)
-    );
-    toast.success('Notification deleted');
+  // Handle delete notification
+  const handleDeleteNotification = async (id) => {
+    try {
+      await deleteNotification(id).unwrap();
+      toast.success('Notification deleted');
+    } catch (error) {
+      toast.error('Failed to delete notification');
+    }
   };
 
-  const clearAllNotifications = () => {
-    setNotifications([]);
-    toast.success('All notifications cleared');
+  // Handle clear all notifications
+  const handleClearAllNotifications = async () => {
+    try {
+      await clearAllNotifications().unwrap();
+      toast.success('All notifications cleared');
+    } catch (error) {
+      toast.error('Failed to clear notifications');
+    }
   };
 
-  const filteredNotifications = notifications.filter(notification => {
-    if (showUnreadOnly && notification.isRead) return false;
-    if (activeFilter === 'all') return true;
-    return notification.type === activeFilter;
-  });
+  // Handle preference toggle
+  const handlePreferenceToggle = async (prefId) => {
+    const updatedPreferences = {
+      ...preferences,
+      [prefId]: !preferences[prefId]
+    };
+    
+    setPreferences(updatedPreferences);
+    
+    try {
+      await updatePreferences(updatedPreferences).unwrap();
+      toast.success('Preferences updated');
+    } catch (error) {
+      // Revert state if API call fails
+      setPreferences(preferences);
+      toast.error('Failed to update preferences');
+    }
+  };
+
+  // Process notifications from the API response
+  const processNotifications = () => {
+    if (!notificationsData?.data) return [];
+    
+    let notifications = [...notificationsData.data];
+    
+    // Apply filters
+    if (showUnreadOnly) {
+      notifications = notifications.filter(notification => !notification.isRead);
+    }
+    
+    if (activeFilter !== 'all') {
+      notifications = notifications.filter(notification => notification.type === activeFilter);
+    }
+    
+    return notifications;
+  };
 
   // Group notifications by date
-  const groupedNotifications = filteredNotifications.reduce((groups, notification) => {
-    const date = notification.date;
-    if (!groups[date]) {
-      groups[date] = [];
+  const groupNotificationsByDate = (notifications) => {
+    return notifications.reduce((groups, notification) => {
+      // Format date for grouping
+      const date = formatDateGroup(notification.createdAt);
+      
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      
+      groups[date].push(notification);
+      return groups;
+    }, {});
+  };
+
+  // Format date for grouping
+  const formatDateGroup = (dateString) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
     }
-    groups[date].push(notification);
-    return groups;
-  }, {});
+  };
+
+  // Format time for display
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Get notification icon based on type
   const getNotificationIcon = (type) => {
@@ -180,14 +230,24 @@ export default function Notifications() {
     }
   };
 
-  const formatTime = (timeString) => {
-    const date = new Date(timeString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Get unread count
+  const getUnreadCount = () => {
+    if (!notificationsData?.data) return 0;
+    return notificationsData.data.filter(notification => !notification.isRead).length;
   };
 
-  const getUnreadCount = () => {
-    return notifications.filter(notification => !notification.isRead).length;
-  };
+  // Prepare filtered notifications and group them by date
+  const filteredNotifications = processNotifications();
+  const groupedNotifications = groupNotificationsByDate(filteredNotifications);
+  
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-16">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <motion.div 
@@ -237,15 +297,15 @@ export default function Notifications() {
 
           <div className="flex gap-2">
             <button
-              onClick={markAllAsRead}
-              disabled={notifications.length === 0}
+              onClick={handleMarkAllAsRead}
+              disabled={filteredNotifications.length === 0}
               className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-600 font-medium rounded-md hover:bg-indigo-100 transition-colors disabled:opacity-50 flex items-center"
             >
               <HiCheckCircle className="w-4 h-4 mr-1" /> Mark all read
             </button>
             <button
-              onClick={clearAllNotifications}
-              disabled={notifications.length === 0}
+              onClick={handleClearAllNotifications}
+              disabled={filteredNotifications.length === 0}
               className="px-3 py-1.5 text-sm bg-red-50 text-red-600 font-medium rounded-md hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center"
             >
               <HiTrash className="w-4 h-4 mr-1" /> Clear all
@@ -262,7 +322,7 @@ export default function Notifications() {
             <div className="space-y-4">
               {notificationsForDate.map((notification) => (
                 <motion.div
-                  key={notification.id}
+                  key={notification._id}
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
@@ -282,12 +342,12 @@ export default function Notifications() {
                           <h3 className="font-medium text-gray-800">{notification.title}</h3>
                           <p className="text-gray-600">{notification.message}</p>
                         </div>
-                        <span className="text-xs text-gray-500">{formatTime(notification.time)}</span>
+                        <span className="text-xs text-gray-500">{formatTime(notification.createdAt)}</span>
                       </div>
                       <div className="mt-3 flex items-center space-x-3">
                         {!notification.isRead && (
                           <button
-                            onClick={() => markAsRead(notification.id)}
+                            onClick={() => handleMarkAsRead(notification._id)}
                             className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
                           >
                             <HiCheck className="w-4 h-4 mr-1" />
@@ -295,7 +355,7 @@ export default function Notifications() {
                           </button>
                         )}
                         <button
-                          onClick={() => deleteNotification(notification.id)}
+                          onClick={() => handleDeleteNotification(notification._id)}
                           className="text-sm text-gray-500 hover:text-red-600 flex items-center"
                         >
                           <HiTrash className="w-4 h-4 mr-1" />
@@ -323,8 +383,8 @@ export default function Notifications() {
       <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-lg font-medium text-gray-800 mb-4">Notification Preferences</h2>
         <div className="space-y-4">
-          {[
-            { id: 'pickup_dropoff', label: 'Pickup & Drop-off alerts', description: 'Get notified when your child boards or exits the bus' },
+          {
+            [{ id: 'pickup_dropoff', label: 'Pickup & Drop-off alerts', description: 'Get notified when your child boards or exits the bus' },
             { id: 'delays', label: 'Delay notifications', description: 'Receive alerts about bus delays or schedule changes' },
             { id: 'payment', label: 'Payment reminders', description: 'Get reminded before monthly payments are due' },
             { id: 'system', label: 'System updates', description: 'Stay informed about app updates and improvements' },
@@ -336,7 +396,12 @@ export default function Notifications() {
               </div>
               <div className="flex items-center space-x-3">
                 <label className="inline-flex items-center cursor-pointer">
-                  <input type="checkbox" defaultChecked className="sr-only peer" />
+                  <input 
+                    type="checkbox" 
+                    checked={preferences[preference.id] || false}
+                    onChange={() => handlePreferenceToggle(preference.id)}
+                    className="sr-only peer" 
+                  />
                   <div className="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
               </div>
@@ -345,5 +410,5 @@ export default function Notifications() {
         </div>
       </div>
     </motion.div>
-  )
+  );
 }

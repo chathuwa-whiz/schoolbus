@@ -97,7 +97,27 @@ const userSchema = new mongoose.Schema(
     
     // For password reset
     resetPasswordToken: String,
-    resetPasswordExpire: Date
+    resetPasswordExpire: Date,
+
+    // Notification preferences
+    notificationPreferences: {
+      pickup_dropoff: {
+        type: Boolean,
+        default: true
+      },
+      delays: {
+        type: Boolean,
+        default: true
+      },
+      payment: {
+        type: Boolean,
+        default: true
+      },
+      system: {
+        type: Boolean,
+        default: true
+      }
+    }
   },
   {
     timestamps: true
