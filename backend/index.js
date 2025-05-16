@@ -8,6 +8,7 @@ import userRoutes from './routes/userRoutes.js';
 import childRoutes from './routes/childRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
 import trackingRoutes from './routes/trackingRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
 
 // Initialize express app
 dotenv.config();
@@ -30,6 +31,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/tracking', trackingRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
