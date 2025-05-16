@@ -45,7 +45,7 @@ export default function Attendance() {
   // Filter students based on search term
   const filteredStudents = studentsData?.data?.length > 0 
     ? studentsData.data.filter(student => 
-        student.name.toLowerCase().includes(searchTerm.toLowerCase())
+        student.name?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     : [];
 

@@ -25,7 +25,7 @@ export const paymentApi = createApi({
         if (!invoiceId || invoiceId === 'undefined') {
           throw new Error('Invalid invoice ID');
         }
-        return `/payments/parent/invoices/${invoiceId}`;
+        return `/parent/invoices/${invoiceId}`;
       },
       // Add proper error handling
       transformErrorResponse: (response, meta, arg) => {
@@ -75,12 +75,12 @@ export const paymentApi = createApi({
       providesTags: ['PaymentHistory']
     }),
     getDriverRouteChildren: builder.query({
-      query: () => '/payments/driver/route-children',
+      query: () => '/driver/route-children',
       providesTags: ['DriverRouteChildren']
     }),
     generateInvoice: builder.mutation({
       query: (invoiceData) => ({
-        url: '/payments/driver/generate-invoice',
+        url: '/driver/generate-invoice',
         method: 'POST',
         body: invoiceData
       }),
