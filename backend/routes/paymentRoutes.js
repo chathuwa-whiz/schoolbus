@@ -8,7 +8,9 @@ import {
   getDriverSalary,
   getDriverPaymentHistory,
   getRouteIncome,
-  getParentPaymentStatus
+  getParentPaymentStatus,
+  getDriverRouteChildren,
+  generateInvoice
 } from '../controllers/PaymentController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -29,5 +31,7 @@ router.get('/driver/salary', authorize('driver'), getDriverSalary);
 router.get('/driver/history', authorize('driver'), getDriverPaymentHistory);
 router.get('/driver/route-income', authorize('driver'), getRouteIncome);
 router.get('/driver/parent-payments', authorize('driver'), getParentPaymentStatus);
+router.get('/driver/route-children', protect, authorize('driver'), getDriverRouteChildren);
+router.post('/driver/generate-invoice', protect, authorize('driver'), generateInvoice);
 
 export default router;

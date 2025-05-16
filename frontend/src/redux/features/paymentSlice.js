@@ -12,7 +12,7 @@ export const paymentApi = createApi({
       return headers;
     }
   }),
-  tagTypes: ['Payment', 'PaymentHistory'],
+  tagTypes: ['Payment', 'PaymentHistory', 'DriverRouteChildren'],
   endpoints: (builder) => ({
     // Parent endpoints
     getParentInvoices: builder.query({
@@ -73,6 +73,18 @@ export const paymentApi = createApi({
     getParentPaymentStatus: builder.query({
       query: () => '/driver/parent-payments',
       providesTags: ['PaymentHistory']
+    }),
+    getDriverRouteChildren: builder.query({
+      query: () => '/payments/driver/route-children',
+      providesTags: ['DriverRouteChildren']
+    }),
+    generateInvoice: builder.mutation({
+      query: (invoiceData) => ({
+        url: '/payments/driver/generate-invoice',
+        method: 'POST',
+        body: invoiceData
+      }),
+      invalidatesTags: ['PaymentHistory', 'DriverRouteChildren']
     })
   }),
 });
@@ -86,5 +98,7 @@ export const {
   useGetDriverPaymentsQuery,
   useGetDriverSalaryQuery,
   useGetRouteIncomeQuery,
-  useGetParentPaymentStatusQuery
+  useGetParentPaymentStatusQuery,
+  useGetDriverRouteChildrenQuery,
+  useGenerateInvoiceMutation
 } = paymentApi;

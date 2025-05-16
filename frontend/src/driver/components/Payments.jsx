@@ -1,24 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { HiCheck, HiOutlineClock, HiOutlineExclamationCircle } from 'react-icons/hi2';
-import { HiDownload } from 'react-icons/hi';
+import { toast } from 'react-hot-toast';
+import { HiCheck, HiOutlineClock, HiOutlineExclamationCircle, HiPlus } from 'react-icons/hi2';
+import { HiDownload, HiDocumentText } from 'react-icons/hi';
 import { 
   useGetDriverSalaryQuery,
   useGetDriverPaymentsQuery, 
   useGetRouteIncomeQuery,
-  useGetParentPaymentStatusQuery
+  useGetParentPaymentStatusQuery,
+  useGetDriverRouteChildrenQuery,
+  useGenerateInvoiceMutation
 } from '../../redux/features/paymentSlice';
 import Spinner from './Spinner';
 
 export default function Payments() {
   const [activeTab, setActiveTab] = useState('summary');
   const [selectedMonth, setSelectedMonth] = useState('August 2023');
+  
+  // Invoice generation state
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedChildren, setSelectedChildren] = useState([]);
+  const [invoiceDetails, setInvoiceDetails] = useState({
+    amount: '',
+    dueDate: '',
+    period: '',
+    notes: ''
+  });
 
   // RTK Query hooks
   const { data: salaryData, isLoading: salaryLoading } = useGetDriverSalaryQuery(selectedMonth);
   const { data: paymentsHistory, isLoading: paymentsLoading } = useGetDriverPaymentsQuery();
   const { data: routeIncomeData, isLoading: routeIncomeLoading } = useGetRouteIncomeQuery(selectedMonth);
   const { data: parentPaymentsData, isLoading: parentPaymentsLoading } = useGetParentPaymentStatusQuery();
+  const { data: routeChildrenData, isLoading: routeChildrenLoading } = useGetDriverRouteChildrenQuery();
+  
+  const [generateInvoice, { isLoading: isGeneratingInvoice }] = useGenerateInvoiceMutation();
+  
+  // Set default due date to 2 weeks from now when the modal opens
+  useEffect(() => {
+    if (showInvoiceModal) {
+      const today = new Date();
+      const twoWeeksLater = new Date();
+      twoWeeksLater.setDate(today.getDate() + 14);
+      
+      setInvoiceDetails({
+        ...invoiceDetails,
+        dueDate: twoWeeksLater.toISOString().split('T')[0],
+        period: `${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`
+      });
+    }
+  }, [showInvoiceModal]);
   
   // Function to render appropriate status badge
   const renderStatusBadge = (status) => {
@@ -49,13 +80,83 @@ export default function Payments() {
         );
     }
   };
+  
+  const handleInvoiceDetailsChange = (e) => {
+    const { name, value } = e.target;
+    setInvoiceDetails({
+      ...invoiceDetails,
+      [name]: value
+    });
+  };
+  
+  const handleChildSelection = (childId) => {
+    if (selectedChildren.includes(childId)) {
+      setSelectedChildren(selectedChildren.filter(id => id !== childId));
+    } else {
+      setSelectedChildren([...selectedChildren, childId]);
+    }
+  };
+  
+  const handleSelectAllChildren = (e) => {
+    if (e.target.checked) {
+      setSelectedChildren(routeChildrenData.data.map(child => child._id));
+    } else {
+      setSelectedChildren([]);
+    }
+  };
+  
+  const handleSubmitInvoice = async () => {
+    if (!invoiceDetails.amount) {
+      toast.error('Please enter an invoice amount');
+      return;
+    }
+    
+    if (!invoiceDetails.dueDate) {
+      toast.error('Please select a due date');
+      return;
+    }
+    
+    if (!invoiceDetails.period) {
+      toast.error('Please enter the invoice period');
+      return;
+    }
+    
+    if (selectedChildren.length === 0) {
+      toast.error('Please select at least one child');
+      return;
+    }
+    
+    try {
+      await generateInvoice({
+        childrenIds: selectedChildren,
+        amount: parseFloat(invoiceDetails.amount),
+        dueDate: invoiceDetails.dueDate,
+        period: invoiceDetails.period,
+        notes: invoiceDetails.notes || undefined
+      }).unwrap();
+      
+      toast.success('Invoice generated successfully');
+      setShowInvoiceModal(false);
+      
+      // Reset form
+      setSelectedChildren([]);
+      setInvoiceDetails({
+        amount: '',
+        dueDate: '',
+        period: '',
+        notes: ''
+      });
+    } catch (error) {
+      toast.error(error.data?.message || 'Failed to generate invoice');
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Payments</h1>
         
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
@@ -67,12 +168,19 @@ export default function Payments() {
             <option value="May 2023">May 2023</option>
             <option value="April 2023">April 2023</option>
           </select>
+          
+          <button
+            onClick={() => setShowInvoiceModal(true)}
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm flex items-center"
+          >
+            <HiPlus className="mr-1" /> New Invoice
+          </button>
         </div>
       </div>
 
       {/* Tab Navigation */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 flex-wrap">
           <button
             onClick={() => setActiveTab('summary')}
             className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
@@ -112,6 +220,16 @@ export default function Payments() {
             }`}
           >
             Parent Payments
+          </button>
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
+              activeTab === 'invoices'
+                ? 'bg-amber-50 text-amber-700 border-b-2 border-amber-500'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Invoices
           </button>
         </div>
 
@@ -403,8 +521,233 @@ export default function Payments() {
               )}
             </motion.div>
           )}
+          
+          {/* New Invoices Tab */}
+          {activeTab === 'invoices' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="bg-amber-50 p-4 mb-6 rounded-lg border border-amber-200">
+                <div className="flex items-center">
+                  <HiDocumentText className="text-amber-600 w-6 h-6 mr-3" />
+                  <div>
+                    <h3 className="font-medium text-amber-800">Generate Invoices</h3>
+                    <p className="text-sm text-amber-700">
+                      Generate invoices for children on your routes. Invoices will be sent to parents automatically.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="ml-auto px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm"
+                  >
+                    <HiPlus className="inline mr-1" /> New Invoice
+                  </button>
+                </div>
+              </div>
+              
+              {routeChildrenLoading ? (
+                <Spinner />
+              ) : routeChildrenData ? (
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <h3 className="font-medium p-4 border-b border-gray-200">Children on Your Routes</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Child Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Grade</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Parent</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Route</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Last Invoice</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Payment Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {routeChildrenData.data.map(child => (
+                          <tr key={child._id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
+                              {child.firstName} {child.lastName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                              {child.grade || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                              {child.parentName || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                              {child.routeName || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                              {child.lastInvoice?.date ? new Date(child.lastInvoice.date).toLocaleDateString() : 'None'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {child.paymentStatus ? renderStatusBadge(child.paymentStatus) : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-red-50 text-red-700 rounded-lg">
+                  Error loading children data
+                </div>
+              )}
+            </motion.div>
+          )}
         </div>
       </div>
+      
+      {/* Invoice Generation Modal */}
+      {showInvoiceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+              <HiDocumentText className="mr-2 text-amber-600" /> Generate New Invoice
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={invoiceDetails.amount}
+                  onChange={handleInvoiceDetailsChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  name="dueDate"
+                  value={invoiceDetails.dueDate}
+                  onChange={handleInvoiceDetailsChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+                <input
+                  type="text"
+                  name="period"
+                  value={invoiceDetails.period}
+                  onChange={handleInvoiceDetailsChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="e.g. August 2023"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                <input
+                  type="text"
+                  name="notes"
+                  value={invoiceDetails.notes}
+                  onChange={handleInvoiceDetailsChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="Any additional details"
+                />
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Select Children</label>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="selectAll"
+                    onChange={handleSelectAllChildren}
+                    checked={selectedChildren.length === routeChildrenData?.data?.length}
+                    className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="selectAll" className="ml-2 text-sm text-gray-700">
+                    Select All
+                  </label>
+                </div>
+              </div>
+              
+              {routeChildrenLoading ? (
+                <div className="p-4 flex justify-center">
+                  <Spinner />
+                </div>
+              ) : routeChildrenData?.data?.length > 0 ? (
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 w-12"></th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Grade</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Parent</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {routeChildrenData.data.map(child => (
+                        <tr key={child._id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedChildren.includes(child._id)}
+                              onChange={() => handleChildSelection(child._id)}
+                              className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                            />
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">
+                            {child.firstName} {child.lastName}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">
+                            {child.grade || 'N/A'}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">
+                            {child.parentName || 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 text-center bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">No children found on your routes</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowInvoiceModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitInvoice}
+                disabled={isGeneratingInvoice || selectedChildren.length === 0}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:bg-amber-300"
+              >
+                {isGeneratingInvoice ? (
+                  <>
+                    <span className="inline-block animate-spin mr-2">⟳</span> Generating...
+                  </>
+                ) : (
+                  'Generate Invoice'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

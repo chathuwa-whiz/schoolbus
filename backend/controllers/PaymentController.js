@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Child from '../models/Child.js';
 import Invoice from '../models/Invoice.js';
 import Receipt from '../models/Receipt.js';
+import Route from '../models/Route.js'; // Import Route model
 import mongoose from 'mongoose';
 import Stripe from 'stripe';
 
@@ -368,6 +369,173 @@ export async function getParentPaymentStatus(req, res) {
     });
   } catch (error) {
     console.error('Get parent payment status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Get children on driver's routes for invoicing
+export async function getDriverRouteChildren(req, res) {
+  try {
+    const driverId = req.user._id;
+    
+    // Get routes assigned to this driver
+    const routes = await Route.find({ driver: driverId });
+    
+    if (!routes.length) {
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
+    }
+    
+    const routeIds = routes.map(route => route._id);
+    
+    // Find all children on these routes with their parent info
+    const children = await Child.find({ route: { $in: routeIds } })
+      .populate('parent', 'firstName lastName')
+      .populate('route', 'name');
+    
+    // Get recent invoice/payment data for each child
+    const childrenWithPaymentInfo = await Promise.all(children.map(async child => {
+      // Find most recent invoice for this child
+      const recentInvoice = await Invoice.findOne({
+        childrenIds: child._id
+      }).sort({ createdAt: -1 });
+      
+      return {
+        _id: child._id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        grade: child.grade,
+        parentName: child.parent ? `${child.parent.firstName} ${child.parent.lastName}` : null,
+        parentId: child.parent?._id,
+        routeName: child.route?.name,
+        routeId: child.route?._id,
+        lastInvoice: recentInvoice ? {
+          id: recentInvoice._id,
+          amount: recentInvoice.amount,
+          date: recentInvoice.issueDate,
+          status: recentInvoice.status
+        } : null,
+        paymentStatus: recentInvoice?.status
+      };
+    }));
+    
+    res.status(200).json({
+      success: true,
+      data: childrenWithPaymentInfo
+    });
+  } catch (error) {
+    console.error('Get driver route children error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Generate invoice for selected children
+export async function generateInvoice(req, res) {
+  try {
+    const driverId = req.user._id;
+    const { childrenIds, amount, dueDate, period, notes } = req.body;
+    
+    if (!childrenIds || !childrenIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'No children selected'
+      });
+    }
+    
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid amount'
+      });
+    }
+    
+    if (!dueDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Due date is required'
+      });
+    }
+    
+    if (!period) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invoice period is required'
+      });
+    }
+    
+    // Verify that these children are on the driver's routes
+    const routes = await Route.find({ driver: driverId });
+    const routeIds = routes.map(route => route._id);
+    
+    const eligibleChildren = await Child.find({
+      _id: { $in: childrenIds },
+      route: { $in: routeIds }
+    }).populate('parent');
+    
+    if (!eligibleChildren.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'No eligible children found'
+      });
+    }
+    
+    // Group children by parent
+    const parentMap = {};
+    eligibleChildren.forEach(child => {
+      if (!child.parent) return;
+      
+      const parentId = child.parent._id.toString();
+      if (!parentMap[parentId]) {
+        parentMap[parentId] = {
+          parent: child.parent,
+          children: []
+        };
+      }
+      parentMap[parentId].children.push(child);
+    });
+    
+    // Create an invoice for each parent
+    const invoicePromises = Object.values(parentMap).map(async ({ parent, children }) => {
+      const childrenIds = children.map(child => child._id);
+      
+      // Calculate amount per child (this could be more complex based on your requirements)
+      const totalAmount = amount * children.length;
+      
+      const invoice = new Invoice({
+        parentId: parent._id,
+        amount: totalAmount,
+        dueDate: new Date(dueDate),
+        period,
+        childrenIds,
+        notes,
+        items: children.map(child => ({
+          description: `Transportation for ${child.firstName} ${child.lastName}`,
+          amount,
+          quantity: 1
+        }))
+      });
+      
+      await invoice.save();
+      return invoice;
+    });
+    
+    const invoices = await Promise.all(invoicePromises);
+    
+    res.status(201).json({
+      success: true,
+      message: `${invoices.length} invoices generated successfully`,
+      invoices
+    });
+  } catch (error) {
+    console.error('Generate invoice error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
