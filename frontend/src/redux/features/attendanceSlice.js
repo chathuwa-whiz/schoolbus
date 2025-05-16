@@ -110,6 +110,19 @@ export const attendanceApi = createApi({
       }),
       invalidatesTags: ['DriverAttendance']
     }),
+
+    // New driver-specific endpoint
+    getDriverAttendanceHistory: builder.query({
+      query: ({ startDate, endDate, route }) => {
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        if (route) params.append('route', route);
+        
+        return `/driver/attendance/history?${params.toString()}`;
+      },
+      providesTags: ['DriverAttendance']
+    }),
   })
 });
 
@@ -123,5 +136,6 @@ export const {
   useGetRecentAttendanceQuery,
   useGetDriverRouteStudentsQuery,
   useMarkAttendanceStatusMutation,
-  useAddAttendanceNoteMutation
+  useAddAttendanceNoteMutation,
+  useGetDriverAttendanceHistoryQuery
 } = attendanceApi;

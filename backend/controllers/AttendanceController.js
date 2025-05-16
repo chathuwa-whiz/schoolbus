@@ -702,3 +702,113 @@ export async function addAttendanceNote(req, res) {
     });
   }
 }
+
+// Get attendance history for driver routes
+export async function getDriverAttendanceHistory(req, res) {
+  try {
+    const driverId = req.user._id;
+    const { startDate, endDate, route } = req.query;
+    
+    // Validate date range
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start and end dates are required'
+      });
+    }
+    
+    // Get routes assigned to this driver
+    const driverRoutes = await Route.find({ driver: driverId });
+    
+    if (!driverRoutes.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No routes assigned to this driver'
+      });
+    }
+    
+    // Filter by specific route type if provided
+    const routeIds = route ? 
+      driverRoutes.filter(r => r.routeType === route).map(r => r._id) : 
+      driverRoutes.map(r => r._id);
+    
+    // Get all students on these routes
+    const students = await Child.find({ route: { $in: routeIds } })
+      .select('_id firstName lastName grade route attendance');
+    
+    // Flatten and process attendance records
+    const attendanceHistory = [];
+    
+    for (const student of students) {
+      // Filter attendance records within date range
+      const filteredAttendance = student.attendance.filter(record => {
+        const recordDate = new Date(record.date);
+        recordDate.setHours(0, 0, 0, 0);
+        
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        
+        return recordDate >= start && recordDate <= end;
+      });
+      
+      // Format records for response
+      filteredAttendance.forEach(record => {
+        attendanceHistory.push({
+          date: record.date,
+          student: {
+            _id: student._id,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            grade: student.grade
+          },
+          morning: {
+            status: record.morningPickup?.status || null,
+            parentReported: record.morningPickup?.status === 'expected' || 
+                          record.morningPickup?.status === 'picked_up'
+          },
+          afternoon: {
+            status: record.afternoonDropoff?.status || null,
+            parentReported: record.afternoonDropoff?.status === 'expected' || 
+                          record.afternoonDropoff?.status === 'dropped_off'
+          },
+          note: record.notes || '',
+          parentNote: record.parentNote || ''
+        });
+      });
+    }
+    
+    // Sort by date (most recent first)
+    attendanceHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Calculate summary statistics
+    const totalRecords = attendanceHistory.length;
+    const morningExpected = attendanceHistory.filter(r => r.morning.parentReported).length;
+    const morningAttended = attendanceHistory.filter(r => r.morning.status === 'picked_up').length;
+    const afternoonExpected = attendanceHistory.filter(r => r.afternoon.parentReported).length;
+    const afternoonAttended = attendanceHistory.filter(r => r.afternoon.status === 'dropped_off').length;
+    
+    const summary = {
+      morningAttendanceRate: morningExpected > 0 ? 
+        `${Math.round((morningAttended / morningExpected) * 100)}%` : '0%',
+      afternoonAttendanceRate: afternoonExpected > 0 ? 
+        `${Math.round((afternoonAttended / afternoonExpected) * 100)}%` : '0%',
+      parentReportingRate: totalRecords > 0 ? 
+        `${Math.round(((morningExpected + afternoonExpected) / (totalRecords * 2)) * 100)}%` : '0%'
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: attendanceHistory,
+      summary
+    });
+  } catch (error) {
+    console.error('Get driver attendance history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}

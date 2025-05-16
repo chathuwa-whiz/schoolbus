@@ -8,7 +8,9 @@ import {
   HiClock,
   HiArrowDown,
   HiHome,
-  HiCalendar
+  HiCalendar,
+  HiInformationCircle,
+  HiExclamationCircle
 } from 'react-icons/hi2';
 import { TbBusStop } from 'react-icons/tb';
 import { 
@@ -39,6 +41,7 @@ export default function AttendanceHistory() {
     afternoonOnly: false
   });
   const [driverNote, setDriverNote] = useState('');
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   
   // Extract month/year for API queries
   const getMonthYearParams = () => {
@@ -69,7 +72,8 @@ export default function AttendanceHistory() {
   
   const {
     data: todayData,
-    isLoading: isLoadingToday
+    isLoading: isLoadingToday,
+    refetch: refetchToday
   } = useGetTodayAttendanceQuery(selectedChild?._id, { skip: !selectedChild });
   
   // API Mutations
@@ -131,23 +135,26 @@ export default function AttendanceHistory() {
         [type]: newValue
       }));
       
-      const updateData = { 
-        [type]: newValue 
-      };
+      const updateData = type === 'morningPickup' 
+        ? { morningPickup: newValue } 
+        : { afternoonDropoff: newValue };
       
       // API call to update attendance
-      const response = await updateDailyAttendance({
+      await updateDailyAttendance({
         childId: selectedChild._id,
-        data: type === 'morningPickup' 
-          ? { morningPickup: newValue } 
-          : { afternoonDropoff: newValue }
+        data: updateData
       }).unwrap();
       
       // Show toast notification
       const childName = selectedChild?.firstName || "your child";
-      const message = `${childName} ${newValue ? 'will be available' : 'will not be available'} for ${type === 'morningPickup' ? 'morning pickup' : 'afternoon dropoff'} today`;
+      const timeText = type === 'morningPickup' ? 'morning pickup' : 'afternoon dropoff';
+      const actionText = newValue ? 'will need' : 'will NOT need';
       
-      toast.success(message);
+      toast.success(`You've updated that ${childName} ${actionText} ${timeText} today`);
+      
+      // Refetch today's data to ensure UI is in sync
+      refetchToday();
+      
     } catch (error) {
       // Revert optimistic update
       setTodayAttendance(prev => ({
@@ -155,7 +162,7 @@ export default function AttendanceHistory() {
         [type]: !prev[type]
       }));
       
-      toast.error('Failed to update attendance status');
+      toast.error('Failed to update attendance. Please try again.');
       console.error('Update attendance error:', error);
     }
   };
@@ -176,7 +183,7 @@ export default function AttendanceHistory() {
       }).unwrap();
       
       // Show success message from API
-      toast.success(response.message || `Successfully reported ${reportData.status} for ${selectedChild.firstName}`);
+      toast.success(response.message || `Successfully reported ${reportData.status === 'absent' ? 'absence' : 'late arrival'} for ${selectedChild.firstName}`);
       
       // Close modal and reset form
       setShowReportModal(false);
@@ -191,8 +198,9 @@ export default function AttendanceHistory() {
       
       // Refetch attendance data
       refetchHistory();
+      refetchToday();
     } catch (error) {
-      toast.error('Failed to report absence');
+      toast.error('Failed to report absence. Please try again.');
       console.error('Report absence error:', error);
     }
   };
@@ -212,7 +220,7 @@ export default function AttendanceHistory() {
       record.status,
       record.pickupTime,
       record.dropoffTime,
-      record.notes
+      record.notes ? record.notes.replace(/,/g, ';') : '' // Replace commas in notes to avoid CSV issues
     ]);
     
     const csvContent = [
@@ -251,12 +259,23 @@ export default function AttendanceHistory() {
         note: driverNote
       }).unwrap();
       
-      toast.success('Note sent to driver');
+      toast.success('Note sent to driver successfully');
       setDriverNote('');
+      refetchToday(); // Refresh data to show the note was sent
     } catch (error) {
-      toast.error('Failed to send note to driver');
+      toast.error('Failed to send note to driver. Please try again.');
       console.error('Send note error:', error);
     }
+  };
+
+  // Determine if child has an active absence report for today
+  const hasActiveAbsenceToday = () => {
+    if (!attendanceHistoryData?.data) return false;
+    
+    const today = new Date().toISOString().split('T')[0];
+    return attendanceHistoryData.data.some(record => 
+      record.date === today && (record.status === "Absent" || record.status === "Late")
+    );
   };
 
   return (
@@ -313,6 +332,20 @@ export default function AttendanceHistory() {
           </button>
         </div>
       </div>
+
+      {/* Help Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800 text-sm">
+        <div className="flex">
+          <HiInformationCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+          <div>
+            <p><strong>How attendance works:</strong></p>
+            <p>1. Toggle switches below to indicate if your child will need bus service today</p>
+            <p>2. Use "Report Absence/Late" for longer absences or when your child will be late</p>
+            <p>3. Send notes to the driver for any special instructions</p>
+            <p>4. View attendance history and download reports as needed</p>
+          </div>
+        </div>
+      </div>
       
       {/* Today's Attendance Section */}
       {selectedChild && (
@@ -325,7 +358,7 @@ export default function AttendanceHistory() {
           <div className="p-5 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center">
               <HiCalendar className="text-indigo-600 w-5 h-5 mr-2" />
-              <h2 className="font-semibold text-lg">Today's Attendance</h2>
+              <h2 className="font-semibold text-lg">Today's Bus Schedule</h2>
             </div>
             <div className="text-sm text-gray-500">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -338,6 +371,21 @@ export default function AttendanceHistory() {
             </div>
           ) : (
             <div className="p-5">
+              {hasActiveAbsenceToday() && (
+                <div className="mb-5 bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+                  <div className="flex">
+                    <HiExclamationCircle className="h-6 w-6 text-amber-500 mr-3" />
+                    <div>
+                      <p className="font-medium text-amber-800">Active absence reported for today</p>
+                      <p className="text-sm text-amber-700">
+                        You've already reported that {selectedChild.firstName} will be absent or late today. 
+                        The settings below have been automatically adjusted.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex flex-col md:flex-row gap-6">
                 {/* Morning Pickup Card */}
                 <div className="flex-1 border border-gray-200 rounded-lg p-4">
@@ -348,11 +396,28 @@ export default function AttendanceHistory() {
                       </div>
                       <h3 className="font-medium">Morning Pickup</h3>
                     </div>
-                    <span className="text-sm text-gray-500">{todayData?.data?.pickupTime || "7:15 AM (expected)"}</span>
+                    <span className="text-sm text-gray-500">{todayData?.data?.pickupTime || "Expected"}</span>
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Is {selectedChild.firstName} available for pickup today?</span>
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-600 mr-2">
+                        Will {selectedChild.firstName} need morning pickup today?
+                      </span>
+                      <div 
+                        className="text-blue-600 cursor-pointer relative"
+                        onMouseEnter={() => setShowInfoTooltip('morning')}
+                        onMouseLeave={() => setShowInfoTooltip(false)}
+                      >
+                        <HiInformationCircle className="h-5 w-5" />
+                        {showInfoTooltip === 'morning' && (
+                          <div className="absolute z-10 w-64 bg-white p-3 rounded-lg shadow-lg border border-gray-200 text-xs text-gray-600 -right-1 top-6">
+                            Toggle this if your child <strong>will NOT need</strong> morning pickup today. 
+                            The driver will be notified not to wait for your child.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     <div className="relative">
                       <label className="inline-flex items-center cursor-pointer">
                         <input 
@@ -360,7 +425,7 @@ export default function AttendanceHistory() {
                           className="sr-only peer"
                           checked={todayAttendance.morningPickup}
                           onChange={() => handleAttendanceToggle('morningPickup')}
-                          disabled={isUpdatingDaily}
+                          disabled={isUpdatingDaily || hasActiveAbsenceToday()}
                         />
                         <div className="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                       </label>
@@ -369,8 +434,8 @@ export default function AttendanceHistory() {
                   
                   <div className="mt-3 px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-600">
                     {todayAttendance.morningPickup ? 
-                      "Driver will pick up the child as scheduled" : 
-                      "Driver will be notified that child won't need pickup today"}
+                      `${selectedChild.firstName} will be picked up by the bus this morning` : 
+                      `${selectedChild.firstName} will NOT need bus pickup this morning`}
                   </div>
                 </div>
                 
@@ -383,11 +448,28 @@ export default function AttendanceHistory() {
                       </div>
                       <h3 className="font-medium">Afternoon Dropoff</h3>
                     </div>
-                    <span className="text-sm text-gray-500">{todayData?.data?.dropoffTime || "3:30 PM (expected)"}</span>
+                    <span className="text-sm text-gray-500">{todayData?.data?.dropoffTime || "Expected"}</span>
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Is {selectedChild.firstName} available for dropoff today?</span>
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-600 mr-2">
+                        Will {selectedChild.firstName} need afternoon dropoff today?
+                      </span>
+                      <div 
+                        className="text-blue-600 cursor-pointer relative"
+                        onMouseEnter={() => setShowInfoTooltip('afternoon')}
+                        onMouseLeave={() => setShowInfoTooltip(false)}
+                      >
+                        <HiInformationCircle className="h-5 w-5" />
+                        {showInfoTooltip === 'afternoon' && (
+                          <div className="absolute z-10 w-64 bg-white p-3 rounded-lg shadow-lg border border-gray-200 text-xs text-gray-600 -right-1 top-6">
+                            Toggle this if your child <strong>will NOT be on</strong> the afternoon bus today. 
+                            For example, if they're being picked up by a parent or staying for after-school activities.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     <div className="relative">
                       <label className="inline-flex items-center cursor-pointer">
                         <input 
@@ -395,7 +477,7 @@ export default function AttendanceHistory() {
                           className="sr-only peer"
                           checked={todayAttendance.afternoonDropoff}
                           onChange={() => handleAttendanceToggle('afternoonDropoff')}
-                          disabled={isUpdatingDaily}
+                          disabled={isUpdatingDaily || hasActiveAbsenceToday()}
                         />
                         <div className="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                       </label>
@@ -404,8 +486,8 @@ export default function AttendanceHistory() {
                   
                   <div className="mt-3 px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-600">
                     {todayAttendance.afternoonDropoff ? 
-                      "Driver will drop off the child as scheduled" : 
-                      "Driver will be notified that child won't need dropoff today"}
+                      `${selectedChild.firstName} will be on the bus for dropoff this afternoon` : 
+                      `${selectedChild.firstName} will NOT need afternoon bus dropoff today`}
                   </div>
                 </div>
               </div>
@@ -413,23 +495,23 @@ export default function AttendanceHistory() {
               {/* Additional notes section */}
               <div className="mt-4">
                 <label htmlFor="todayNotes" className="block text-sm font-medium text-gray-700 mb-1">
-                  Additional notes for driver (optional)
+                  Send special instructions to driver (optional)
                 </label>
                 <div className="flex gap-2">
                   <textarea 
                     id="todayNotes" 
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    placeholder="Add any special instructions for today..."
+                    placeholder="Example: Child will be picked up by grandmother today, etc."
                     rows="2"
                     value={driverNote}
                     onChange={(e) => setDriverNote(e.target.value)}
                   ></textarea>
                   <button 
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors self-end"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors self-end disabled:bg-indigo-300 disabled:cursor-not-allowed"
                     onClick={handleSendNote}
                     disabled={isSendingNote || !driverNote.trim()}
                   >
-                    {isSendingNote ? 'Sending...' : 'Send'}
+                    {isSendingNote ? 'Sending...' : 'Send Note'}
                   </button>
                 </div>
               </div>
@@ -515,7 +597,7 @@ export default function AttendanceHistory() {
             <div className="ml-3">
               <h3 className="text-sm font-medium text-amber-800">Upcoming Reported Absence</h3>
               <div className="mt-2 text-sm text-amber-700">
-                <p>You've reported an upcoming absence for your child. The bus driver will be notified.</p>
+                <p>You've reported an upcoming absence for {selectedChild.firstName}. The bus driver has been notified.</p>
               </div>
             </div>
           </div>
@@ -637,8 +719,8 @@ export default function AttendanceHistory() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   >
-                    <option value="absent">Absent</option>
-                    <option value="late">Late Arrival</option>
+                    <option value="absent">Absent (Child will not come to school)</option>
+                    <option value="late">Late Arrival (Child will come late)</option>
                   </select>
                 </div>
                 
@@ -684,7 +766,7 @@ export default function AttendanceHistory() {
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <label htmlFor="morningOnly" className="ml-2 text-sm text-gray-700">
-                      Morning pickup only
+                      Morning only (Child will not need morning pickup)
                     </label>
                   </div>
                   <div className="flex items-center">
@@ -696,7 +778,7 @@ export default function AttendanceHistory() {
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <label htmlFor="afternoonOnly" className="ml-2 text-sm text-gray-700">
-                      Afternoon dropoff only
+                      Afternoon only (Child will not need afternoon dropoff)
                     </label>
                   </div>
                 </div>
