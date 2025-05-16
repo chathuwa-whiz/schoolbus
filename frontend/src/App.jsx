@@ -8,6 +8,9 @@ import ParentDashboardLayout from './parent/DashboardLayout'
 import DriverRegister from './driver/Register'
 import DriverLogin from './driver/Login'
 import DriverDashboardLayout from './driver/DashboardLayout'
+import AdminRegister from './admin/Register'
+import AdminLogin from './admin/Login'
+import AdminDashboardLayout from './admin/DashboardLayout'
 
 // Parent components
 import Overview from './parent/components/Overview'
@@ -28,6 +31,9 @@ import DriverPayments from './driver/components/Payments'
 import DriverReports from './driver/components/Reports'
 import DriverSettings from './driver/components/Settings'
 
+// Admin components
+
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -38,6 +44,8 @@ export default function App() {
         <Route path="/parent/login" element={<ParentLogin />} />
         <Route path="/driver/register" element={<DriverRegister />} />
         <Route path="/driver/login" element={<DriverLogin />} />
+        <Route path="/admin/register" element={<AdminRegister />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
         
         {/* Protected parent routes */}
         <Route path="/parent" element={
@@ -68,6 +76,15 @@ export default function App() {
           <Route path="payments" element={<DriverPayments />} />
           <Route path="reports" element={<DriverReports />} />
           <Route path="settings" element={<DriverSettings />} />
+        </Route>
+
+        {/* Protected admin routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminDashboardLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<div>Admin Overview</div>} />
         </Route>
         
         {/* Catch all route - 404 */}
