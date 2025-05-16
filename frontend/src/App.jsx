@@ -35,6 +35,9 @@ import DriverSettings from './driver/components/Settings'
 import AdminOverview from './admin/components/Overview'
 import AdminRoutes from './admin/components/Routes'
 import AdminVehicles from './admin/components/Vehicles'
+import AdminSettings from './admin/components/Settings'
+import AdminUsers from './admin/components/Users'
+import AdminReports from './admin/components/Reports'
 
 export default function App() {
   return (
@@ -89,6 +92,9 @@ export default function App() {
           <Route index element={<AdminOverview />} />
           <Route path="routes" element={<AdminRoutes />} />
           <Route path="vehicles" element={<AdminVehicles />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="reports" element={<AdminReports />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
         
         {/* Catch all route - 404 */}
