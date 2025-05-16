@@ -2,6 +2,9 @@ import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './ProtectedRoute'
 import Home from './home/Home'
+import Features from './home/Features'
+import Pricing from './home/Pricing'
+import Contact from './home/Contact'
 import ParentRegister from './parent/Register'
 import ParentLogin from './parent/Login'
 import ParentDashboardLayout from './parent/DashboardLayout'
@@ -45,6 +48,9 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/parent/register" element={<ParentRegister />} />
         <Route path="/parent/login" element={<ParentLogin />} />
         <Route path="/driver/register" element={<DriverRegister />} />
