@@ -3,18 +3,45 @@ import { HiUsers, HiTruck, HiClipboardCheck, HiExclamation, HiCreditCard } from 
 import { HiMapPin } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
+import { useGetAllUsersQuery } from '../../redux/features/userSlice';
+import { useGetAllBusesQuery } from '../../redux/features/busSlice';
+import { useGetAllRoutesQuery } from '../../redux/features/routeSlice';
+import Spinner from './Spinner';
+import { toast } from 'react-hot-toast';
 
 export default function Overview() {
-  // Mock data for dashboard - would be replaced with API calls
+  // Fetch real data from API using RTK Query hooks
+  const { data: usersData, isLoading: usersLoading, error: usersError } = useGetAllUsersQuery();
+  const { data: busesData, isLoading: busesLoading, error: busesError } = useGetAllBusesQuery();
+  const { data: routesData, isLoading: routesLoading, error: routesError } = useGetAllRoutesQuery();
+
+  // Check if any data is still loading
+  const isLoading = usersLoading || busesLoading || routesLoading;
+
+  // Handle errors from API requests
+  React.useEffect(() => {
+    if (usersError) toast.error("Failed to load users data");
+    if (busesError) toast.error("Failed to load vehicles data");
+    if (routesError) toast.error("Failed to load routes data");
+  }, [usersError, busesError, routesError]);
+
+  // Calculate real stats from fetched data
   const stats = {
-    totalUsers: 157,
-    activeDrivers: 28,
-    totalVehicles: 35,
-    activeRoutes: 42,
+    totalUsers: usersData?.users?.length || 0,
+    activeDrivers: usersData?.users?.filter(user => user.role === 'driver' && user.isActive)?.length || 0,
+    totalVehicles: busesData?.data?.length || 0,
+    activeRoutes: routesData?.data?.filter(route => route.isActive)?.length || 0,
+    // These are still static since we don't have a dedicated API for them
     pendingApprovals: 5,
     pendingPayments: 12
   };
 
+  // Calculate route breakdown
+  const morningRoutes = routesData?.data?.filter(route => route.type === 'morning' && route.isActive)?.length || 0;
+  const afternoonRoutes = routesData?.data?.filter(route => route.type === 'afternoon' && route.isActive)?.length || 0;
+
+  // These are still mock data since we don't have endpoints for them yet
+  // You should replace these with real API calls when available
   const recentActivity = [
     { id: 1, user: 'John Smith', action: 'added a new route', time: '10 minutes ago' },
     { id: 2, user: 'Sarah Johnson', action: 'approved driver application', time: '25 minutes ago' },
@@ -29,6 +56,15 @@ export default function Overview() {
     { id: 3, type: 'Vehicle Maintenance', user: 'David Lee', date: '2023-08-14' },
     { id: 4, type: 'Driver Application', user: 'Jennifer Miller', date: '2023-08-15' }
   ];
+
+  // Show a loading spinner while data is being fetched
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -83,7 +119,9 @@ export default function Overview() {
             </div>
           </div>
           <div className="mt-4 flex justify-between text-sm">
-            <span className="text-gray-500">All buses operational</span>
+            <span className="text-gray-500">
+              {busesData?.data?.filter(bus => bus.status === 'active')?.length || 0} operational buses
+            </span>
             <Link to="/admin/vehicles" className="text-blue-600 hover:text-blue-800">Manage</Link>
           </div>
         </motion.div>
@@ -104,7 +142,7 @@ export default function Overview() {
             </div>
           </div>
           <div className="mt-4 flex justify-between text-sm">
-            <span className="text-gray-500">20 morning, 22 afternoon</span>
+            <span className="text-gray-500">{morningRoutes} morning, {afternoonRoutes} afternoon</span>
             <Link to="/admin/routes" className="text-blue-600 hover:text-blue-800">View routes</Link>
           </div>
         </motion.div>
@@ -136,10 +174,16 @@ export default function Overview() {
                       <p className="text-xs text-gray-500">{request.user} • {request.date}</p>
                     </div>
                     <div className="flex space-x-2">
-                      <button className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200">
+                      <button 
+                        className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200"
+                        onClick={() => toast.success(`Request from ${request.user} approved`)}
+                      >
                         Approve
                       </button>
-                      <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">
+                      <button 
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+                        onClick={() => toast.info(`Viewing details for ${request.type}`)}
+                      >
                         Details
                       </button>
                     </div>
@@ -182,14 +226,16 @@ export default function Overview() {
         </motion.div>
       </div>
 
-      {/* Action Cards */}
+      {/* Action Cards - These stay the same */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* User Management Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.5 }}
           className="bg-blue-50 rounded-xl shadow-sm p-6 border border-blue-100"
         >
+          {/* Content remains the same */}
           <div className="flex items-center mb-4">
             <div className="bg-blue-100 rounded-lg p-2">
               <HiUsers className="h-5 w-5 text-blue-600" />
@@ -210,12 +256,14 @@ export default function Overview() {
           </Link>
         </motion.div>
 
+        {/* Route Assignment Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
           className="bg-purple-50 rounded-xl shadow-sm p-6 border border-purple-100"
         >
+          {/* Content remains the same */}
           <div className="flex items-center mb-4">
             <div className="bg-purple-100 rounded-lg p-2">
               <HiMapPin className="h-5 w-5 text-purple-600" />
@@ -236,12 +284,14 @@ export default function Overview() {
           </Link>
         </motion.div>
 
+        {/* Reports Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.7 }}
           className="bg-green-50 rounded-xl shadow-sm p-6 border border-green-100"
         >
+          {/* Content remains the same */}
           <div className="flex items-center mb-4">
             <div className="bg-green-100 rounded-lg p-2">
               <HiClipboardCheck className="h-5 w-5 text-green-600" />
