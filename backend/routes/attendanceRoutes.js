@@ -5,7 +5,8 @@ import {
   getTodayAttendance,
   reportAbsence,
   updateDailyAttendance,
-  sendDriverNote
+  sendDriverNote,
+  getRecentAttendance
 } from '../controllers/AttendanceController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -21,5 +22,6 @@ router.get('/child/:childId/today', authorize('parent'), getTodayAttendance);
 router.post('/child/:childId/report', authorize('parent'), reportAbsence);
 router.put('/child/:childId/daily', authorize('parent'), updateDailyAttendance);
 router.post('/child/:childId/note', authorize('parent'), sendDriverNote);
+router.get('/recent', authorize('parent'), getRecentAttendance);
 
 export default router;

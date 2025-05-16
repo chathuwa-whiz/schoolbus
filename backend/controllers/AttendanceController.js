@@ -1,5 +1,6 @@
 import Child from '../models/Child.js';
 import User from '../models/User.js';
+import Attendance from '../models/Attendance.js';
 
 // Get attendance history for a specific child
 export async function getAttendanceHistory(req, res) {
@@ -421,6 +422,39 @@ export async function sendDriverNote(req, res) {
     });
   } catch (error) {
     console.error('Send driver note error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+}
+
+// Get recent attendance for parent's children
+export async function getRecentAttendance(req, res) {
+  try {
+    const parentId = req.user._id;
+    
+    // Get all children for this parent
+    const children = await Child.find({ parent: parentId }).select('_id');
+    const childIds = children.map(child => child._id);
+    
+    // Get recent attendance records (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const attendance = await Attendance.find({
+      childId: { $in: childIds },
+      date: { $gte: sevenDaysAgo }
+    })
+    .sort({ date: -1 })
+    .limit(10);
+    
+    res.status(200).json({
+      success: true,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Get recent attendance error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

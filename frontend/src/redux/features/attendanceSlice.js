@@ -73,6 +73,12 @@ export const attendanceApi = createApi({
       invalidatesTags: (result, error, { childId }) => [
         { type: 'ChildAttendance', id: childId }
       ]
+    }),
+
+    // Get recent attendance records
+    getRecentAttendance: builder.query({
+      query: () => `/recent`,
+      providesTags: ['Attendance']
     })
   })
 });
@@ -83,5 +89,6 @@ export const {
   useGetTodayAttendanceQuery,
   useUpdateDailyAttendanceMutation,
   useReportAbsenceMutation,
-  useSendDriverNoteMutation
+  useSendDriverNoteMutation,
+  useGetRecentAttendanceQuery
 } = attendanceApi;
