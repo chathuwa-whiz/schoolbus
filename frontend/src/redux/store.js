@@ -6,6 +6,7 @@ import { routeApi } from './features/routeSlice';
 import { trackingApi } from './features/trackingSlice';
 import { attendanceApi } from './features/attendanceSlice';
 import { paymentApi } from './features/paymentSlice';
+import { busApi } from './features/busSlice';
 import authReducer from './features/authSlice';
 
 export const store = configureStore({
@@ -16,6 +17,7 @@ export const store = configureStore({
     [trackingApi.reducerPath]: trackingApi.reducer,
     [attendanceApi.reducerPath]: attendanceApi.reducer,
     [paymentApi.reducerPath]: paymentApi.reducer,
+    [busApi.reducerPath]: busApi.reducer,
     auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
@@ -25,7 +27,8 @@ export const store = configureStore({
         .concat(routeApi.middleware)
         .concat(trackingApi.middleware)
         .concat(attendanceApi.middleware)
-        .concat(paymentApi.middleware),
+        .concat(paymentApi.middleware)
+        .concat(busApi.middleware),
 });
 
 setupListeners(store.dispatch);

@@ -1,11 +1,31 @@
 import express from 'express';
-import { getActiveRoutes, getRouteById } from '../controllers/RouteController.js';
-import { protect } from '../middleware/auth.js';
+import { 
+  getActiveRoutes, 
+  getRouteById,
+  getAllRoutes,
+  createRoute,
+  updateRoute,
+  deleteRoute,
+  assignDriverToRoute,
+  unassignDriverFromRoute
+} from '../controllers/RouteController.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Protected routes
-router.get('/active', protect, getActiveRoutes);
-router.get('/:id', protect, getRouteById);
+// All routes require authentication
+router.use(protect);
+
+// Public routes (accessible by all authenticated users)
+router.get('/active', getActiveRoutes);
+router.get('/:id', getRouteById);
+
+// Admin only routes
+router.get('/', authorize('admin'), getAllRoutes);
+router.post('/', authorize('admin'), createRoute);
+router.put('/:id', authorize('admin'), updateRoute);
+router.delete('/:id', authorize('admin'), deleteRoute);
+router.patch('/:id/assign-driver', authorize('admin'), assignDriverToRoute);
+router.patch('/:id/unassign-driver', authorize('admin'), unassignDriverFromRoute);
 
 export default router;

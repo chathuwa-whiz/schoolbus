@@ -10,6 +10,7 @@ import routeRoutes from './routes/routeRoutes.js';
 import trackingRoutes from './routes/trackingRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import busRoutes from './routes/busRoutes.js'; // Add this line with your other route imports
 
 // Initialize express app
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/routes', routeRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/buses', busRoutes); // Then add this line where you register other routes
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

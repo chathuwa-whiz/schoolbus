@@ -1,80 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { HiSearch, HiPlusCircle, HiPencil, HiTrash, HiUserCircle, HiChevronDown, HiChevronRight } from 'react-icons/hi';
 import { toast } from 'react-hot-toast';
+import { 
+  useGetAllRoutesQuery, 
+  useGetAvailableDriversQuery, 
+  useDeleteRouteMutation, 
+  useAssignDriverToRouteMutation,
+  useUnassignDriverFromRouteMutation
+} from '../../redux/features/routeSlice';
+import Spinner from '../components/Spinner';
+import CreateRouteModal from './CreateRouteModal';
 
 export default function Routes() {
-  const [routes, setRoutes] = useState([
-    { 
-      id: 1, 
-      name: "Morning Route A", 
-      type: "morning", 
-      school: "Lincoln Elementary",
-      stops: 8,
-      students: 12,
-      driver: { id: 101, name: "John Smith" },
-      status: "active" 
-    },
-    { 
-      id: 2, 
-      name: "Afternoon Route A", 
-      type: "afternoon", 
-      school: "Lincoln Elementary",
-      stops: 8,
-      students: 12,
-      driver: { id: 101, name: "John Smith" },
-      status: "active" 
-    },
-    { 
-      id: 3, 
-      name: "Morning Route B", 
-      type: "morning", 
-      school: "Washington Middle School",
-      stops: 6,
-      students: 9,
-      driver: { id: 102, name: "Maria Rodriguez" },
-      status: "active" 
-    },
-    { 
-      id: 4, 
-      name: "Afternoon Route B", 
-      type: "afternoon", 
-      school: "Washington Middle School",
-      stops: 6,
-      students: 9,
-      driver: { id: 102, name: "Maria Rodriguez" },
-      status: "active" 
-    },
-    { 
-      id: 5, 
-      name: "Morning Route C", 
-      type: "morning", 
-      school: "Jefferson High School",
-      stops: 5,
-      students: 15,
-      driver: null,
-      status: "inactive" 
-    },
-    { 
-      id: 6, 
-      name: "Afternoon Route C", 
-      type: "afternoon", 
-      school: "Jefferson High School",
-      stops: 5,
-      students: 15,
-      driver: null,
-      status: "inactive" 
-    }
-  ]);
+  // RTK Query hooks
+  const { data: routesData, isLoading: routesLoading, error: routesError } = useGetAllRoutesQuery();
+  const { data: driversData, isLoading: driversLoading, error: driversError } = useGetAvailableDriversQuery();
+  const [deleteRoute, { isLoading: isDeleting }] = useDeleteRouteMutation();
+  const [assignDriver, { isLoading: isAssigning }] = useAssignDriverToRouteMutation();
+  const [unassignDriver, { isLoading: isUnassigning }] = useUnassignDriverFromRouteMutation();
 
-  const [drivers, setDrivers] = useState([
-    { id: 101, name: "John Smith", available: true },
-    { id: 102, name: "Maria Rodriguez", available: true },
-    { id: 103, name: "David Chen", available: true },
-    { id: 104, name: "Sarah Johnson", available: true },
-    { id: 105, name: "Michael Brown", available: true }
-  ]);
-
+  // Local state
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [expandedRoute, setExpandedRoute] = useState(null);
@@ -84,63 +30,82 @@ export default function Routes() {
   const [selectedDriver, setSelectedDriver] = useState(null);
 
   // Filter routes
-  const filteredRoutes = routes.filter(route => {
+  const filteredRoutes = routesData?.data ? routesData.data.filter(route => {
     const matchesSearch = route.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           route.school.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || route.type === filterType;
     return matchesSearch && matchesType;
-  });
+  }) : [];
 
-  const handleDeleteRoute = (routeId) => {
+  // Handle route deletion
+  const handleDeleteRoute = async (routeId) => {
     if (window.confirm("Are you sure you want to delete this route?")) {
-      setRoutes(routes.filter(route => route.id !== routeId));
-      toast.success("Route deleted successfully");
+      try {
+        await deleteRoute(routeId).unwrap();
+        toast.success("Route deleted successfully");
+      } catch (error) {
+        console.error('Delete route error:', error);
+        toast.error(error.data?.message || "Failed to delete route");
+      }
     }
   };
 
+  // Toggle route expansion
   const handleRouteExpand = (routeId) => {
     setExpandedRoute(expandedRoute === routeId ? null : routeId);
   };
 
+  // Open assign driver modal
   const handleAssignDriver = (route) => {
     setSelectedRoute(route);
     setShowAssignModal(true);
   };
 
-  const confirmAssignDriver = () => {
+  // Submit driver assignment
+  const confirmAssignDriver = async () => {
     if (selectedDriver) {
-      setRoutes(routes.map(route => 
-        route.id === selectedRoute.id 
-          ? { 
-              ...route, 
-              driver: { id: selectedDriver.id, name: selectedDriver.name },
-              status: "active"
-            } 
-          : route
-      ));
-      toast.success(`Driver ${selectedDriver.name} assigned to route ${selectedRoute.name}`);
-      setShowAssignModal(false);
-      setSelectedRoute(null);
-      setSelectedDriver(null);
+      try {
+        await assignDriver({
+          routeId: selectedRoute._id,
+          driverId: selectedDriver._id
+        }).unwrap();
+        
+        toast.success(`Driver ${selectedDriver.firstName} ${selectedDriver.lastName} assigned to route ${selectedRoute.name}`);
+        setShowAssignModal(false);
+        setSelectedRoute(null);
+        setSelectedDriver(null);
+      } catch (error) {
+        console.error('Assign driver error:', error);
+        toast.error(error.data?.message || "Failed to assign driver");
+      }
     } else {
       toast.error("Please select a driver");
     }
   };
 
-  const handleUnassignDriver = (routeId) => {
+  // Handle driver unassignment
+  const handleUnassignDriver = async (routeId) => {
     if (window.confirm("Are you sure you want to unassign the driver from this route?")) {
-      setRoutes(routes.map(route => 
-        route.id === routeId 
-          ? { 
-              ...route, 
-              driver: null,
-              status: "inactive"
-            } 
-          : route
-      ));
-      toast.success("Driver unassigned successfully");
+      try {
+        await unassignDriver(routeId).unwrap();
+        toast.success("Driver unassigned successfully");
+      } catch (error) {
+        console.error('Unassign driver error:', error);
+        toast.error(error.data?.message || "Failed to unassign driver");
+      }
     }
   };
+
+  // Handle API errors
+  useEffect(() => {
+    if (routesError) {
+      toast.error(routesError.data?.message || "Failed to load routes");
+    }
+    
+    if (driversError) {
+      toast.error(driversError.data?.message || "Failed to load drivers");
+    }
+  }, [routesError, driversError]);
 
   return (
     <div className="space-y-6">
@@ -200,163 +165,196 @@ export default function Routes() {
           <h2 className="text-lg font-semibold text-gray-800">
             Routes
             <span className="ml-2 text-sm font-normal text-gray-500">
-              ({filteredRoutes.length} routes, {filteredRoutes.filter(r => r.driver).length} assigned)
+              {routesData ? `(${filteredRoutes.length} routes, ${filteredRoutes.filter(r => r.driver).length} assigned)` : ''}
             </span>
           </h2>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Route Details
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  School
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statistics
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Driver
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredRoutes.length > 0 ? (
-                filteredRoutes.map((route) => (
-                  <React.Fragment key={route.id}>
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center cursor-pointer" onClick={() => handleRouteExpand(route.id)}>
-                          {expandedRoute === route.id ? (
-                            <HiChevronDown className="h-5 w-5 text-gray-400 mr-2" />
-                          ) : (
-                            <HiChevronRight className="h-5 w-5 text-gray-400 mr-2" />
-                          )}
-                          <div>
-                            <div className="font-medium text-gray-900">{route.name}</div>
-                            <div className="text-sm text-gray-500 capitalize">{route.type} Route</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{route.school}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{route.stops} stops</div>
-                        <div className="text-sm text-gray-500">{route.students} students</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {route.driver ? (
-                          <div className="flex items-center">
-                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                              {route.driver.name.charAt(0)}
-                            </div>
-                            <div className="ml-3">
-                              <div className="text-sm font-medium text-gray-900">{route.driver.name}</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleAssignDriver(route)}
-                            className="inline-flex items-center px-2.5 py-1.5 border border-blue-300 text-xs font-medium rounded text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                          >
-                            + Assign Driver
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          route.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {route.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <HiPencil className="h-5 w-5" />
-                          </button>
-                          {route.driver && (
-                            <button 
-                              onClick={() => handleUnassignDriver(route.id)}
-                              className="text-yellow-600 hover:text-yellow-900"
-                            >
-                              <HiUserCircle className="h-5 w-5" />
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleDeleteRoute(route.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <HiTrash className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    {expandedRoute === route.id && (
-                      <tr>
-                        <td colSpan="6" className="px-6 py-4 bg-gray-50">
-                          <div className="text-sm text-gray-500">
-                            <h3 className="font-medium text-gray-700 mb-2">Route Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div>
-                                <p className="font-medium">Stops:</p>
-                                <ul className="list-disc list-inside mt-1">
-                                  <li>Stop 1 - 8:00 AM</li>
-                                  <li>Stop 2 - 8:15 AM</li>
-                                  <li>Stop 3 - 8:30 AM</li>
-                                  <li>School - 8:45 AM</li>
-                                </ul>
-                              </div>
-                              <div>
-                                <p className="font-medium">Students:</p>
-                                <ul className="list-disc list-inside mt-1">
-                                  <li>John D. - Grade 3</li>
-                                  <li>Sarah M. - Grade 4</li>
-                                  <li>Michael K. - Grade 3</li>
-                                  <li>+ {route.students - 3} more</li>
-                                </ul>
-                              </div>
-                              <div>
-                                <p className="font-medium">Actions:</p>
-                                <div className="mt-2 space-y-2">
-                                  <button className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 w-full text-left">
-                                    View on Map
-                                  </button>
-                                  <button className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 w-full text-left">
-                                    Edit Route Details
-                                  </button>
-                                  <button className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 w-full text-left">
-                                    Print Route Sheet
-                                  </button>
-                                </div>
-                              </div>
+        {routesLoading ? (
+          <div className="p-12 flex justify-center">
+            <Spinner />
+          </div>
+        ) : routesError ? (
+          <div className="p-6 text-center text-red-500">
+            Failed to load routes. Please try refreshing the page.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Route Details
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    School
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statistics
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Driver
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredRoutes.length > 0 ? (
+                  filteredRoutes.map((route) => (
+                    <React.Fragment key={route._id}>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center cursor-pointer" onClick={() => handleRouteExpand(route._id)}>
+                            {expandedRoute === route._id ? (
+                              <HiChevronDown className="h-5 w-5 text-gray-400 mr-2" />
+                            ) : (
+                              <HiChevronRight className="h-5 w-5 text-gray-400 mr-2" />
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{route.name}</div>
+                              <div className="text-sm text-gray-500 capitalize">{route.type} Route</div>
                             </div>
                           </div>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{route.school}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{route.stops?.length || 0} stops</div>
+                          <div className="text-sm text-gray-500">{route.students?.length || 0} students</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {route.driver ? (
+                            <div className="flex items-center">
+                              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                {route.driver.firstName?.charAt(0)}{route.driver.lastName?.charAt(0)}
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {route.driver.firstName} {route.driver.lastName}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleAssignDriver(route)}
+                              className="inline-flex items-center px-2.5 py-1.5 border border-blue-300 text-xs font-medium rounded text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              disabled={isAssigning}
+                            >
+                              + Assign Driver
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            route.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {route.isActive ? 'active' : 'inactive'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end space-x-2">
+                            <button 
+                              className="text-blue-600 hover:text-blue-900"
+                              onClick={() => {
+                                // Navigate to edit route page or show edit modal
+                              }}
+                            >
+                              <HiPencil className="h-5 w-5" />
+                            </button>
+                            {route.driver && (
+                              <button 
+                                onClick={() => handleUnassignDriver(route._id)}
+                                className="text-yellow-600 hover:text-yellow-900"
+                                disabled={isUnassigning}
+                              >
+                                <HiUserCircle className="h-5 w-5" />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleDeleteRoute(route._id)}
+                              className="text-red-600 hover:text-red-900"
+                              disabled={isDeleting}
+                            >
+                              <HiTrash className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                    No routes found matching your search
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                      {expandedRoute === route._id && (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-4 bg-gray-50">
+                            <div className="text-sm text-gray-500">
+                              <h3 className="font-medium text-gray-700 mb-2">Route Details</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                  <p className="font-medium">Stops:</p>
+                                  {route.stops && route.stops.length > 0 ? (
+                                    <ul className="list-disc list-inside mt-1">
+                                      {route.stops.map((stop, index) => (
+                                        <li key={index}>
+                                          {stop.name} - {stop.arrivalTime}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-gray-400 mt-1">No stops defined</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium">Students:</p>
+                                  {route.students && route.students.length > 0 ? (
+                                    <ul className="list-disc list-inside mt-1">
+                                      {route.students.slice(0, 3).map((student, index) => (
+                                        <li key={index}>
+                                          {student.firstName} {student.lastName} - Grade {student.grade}
+                                        </li>
+                                      ))}
+                                      {route.students.length > 3 && (
+                                        <li>+ {route.students.length - 3} more</li>
+                                      )}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-gray-400 mt-1">No students assigned</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium">Actions:</p>
+                                  <div className="mt-2 space-y-2">
+                                    <button className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 w-full text-left">
+                                      View on Map
+                                    </button>
+                                    <button className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 w-full text-left">
+                                      Edit Route Details
+                                    </button>
+                                    <button className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 w-full text-left">
+                                      Print Route Sheet
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                      No routes found matching your search
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Assign Driver Modal */}
@@ -372,38 +370,52 @@ export default function Routes() {
               Select a driver to assign to <span className="font-medium">{selectedRoute.name}</span>
             </p>
 
-            <div className="max-h-60 overflow-y-auto mb-6">
-              <div className="space-y-2">
-                {drivers.map(driver => (
-                  <div 
-                    key={driver.id}
-                    onClick={() => setSelectedDriver(driver)}
-                    className={`p-3 border rounded-lg cursor-pointer flex items-center ${
-                      selectedDriver?.id === driver.id 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                      {driver.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium">{driver.name}</p>
-                      <p className="text-xs text-gray-500">ID: {driver.id}</p>
-                    </div>
-                    {selectedDriver?.id === driver.id && (
-                      <div className="ml-auto">
-                        <div className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+            {driversLoading ? (
+              <div className="flex justify-center my-8">
+                <Spinner />
               </div>
-            </div>
+            ) : driversError ? (
+              <div className="text-center text-red-500 my-8">
+                Failed to load drivers. Please try again.
+              </div>
+            ) : (
+              <div className="max-h-60 overflow-y-auto mb-6">
+                {driversData?.drivers?.length > 0 ? (
+                  <div className="space-y-2">
+                    {driversData.drivers.map(driver => (
+                      <div 
+                        key={driver._id}
+                        onClick={() => setSelectedDriver(driver)}
+                        className={`p-3 border rounded-lg cursor-pointer flex items-center ${
+                          selectedDriver?._id === driver._id 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                          {driver.firstName.charAt(0)}{driver.lastName.charAt(0)}
+                        </div>
+                        <div className="ml-3">
+                          <p className="font-medium">{driver.firstName} {driver.lastName}</p>
+                          <p className="text-xs text-gray-500">ID: {driver._id}</p>
+                        </div>
+                        {selectedDriver?._id === driver._id && (
+                          <div className="ml-auto">
+                            <div className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 my-8">No available drivers found</p>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end space-x-3">
               <button
@@ -420,18 +432,25 @@ export default function Routes() {
               <button
                 type="button"
                 className={`px-4 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                  selectedDriver 
+                  selectedDriver && !isAssigning
                     ? 'bg-blue-600 hover:bg-blue-700' 
                     : 'bg-blue-400 cursor-not-allowed'
                 }`}
                 onClick={confirmAssignDriver}
-                disabled={!selectedDriver}
+                disabled={!selectedDriver || isAssigning}
               >
-                Assign Driver
+                {isAssigning ? 'Assigning...' : 'Assign Driver'}
               </button>
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Create Route Modal */}
+      {showAddModal && (
+        <CreateRouteModal 
+          onClose={() => setShowAddModal(false)} 
+        />
       )}
     </div>
   );
