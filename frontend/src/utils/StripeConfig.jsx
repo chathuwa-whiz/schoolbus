@@ -3,7 +3,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
 // Replace with your actual Stripe publishable key
-const stripePromise = loadStripe('pk_test_51R7t0oG8piHs7v556meTuJcbOp532bALYa8SnZtwekL7XGVktZGSfxw3WbCLU7DPGqcz0nCNJoyDiAwqrF2YyWEO007q7lpsAa');
+const stripePromise = loadStripe('pk_test_51QewmBHf2gXNKg51LKwkjxVcjbaOxgRaqABnlTkj8dWhMXJkzjFaeTIEvt0VEmfuDb2gKJJk4bDJzj4MIRQ9gAxo00O7n8qkdb');
 
 export default function StripeConfig({ children }) {
 

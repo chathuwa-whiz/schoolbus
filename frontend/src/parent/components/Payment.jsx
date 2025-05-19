@@ -168,7 +168,7 @@ function PaymentForm() {
                   {paymentDetails.children.map((child, index) => (
                     <div key={index} className="flex justify-between mb-2 text-sm">
                       <span>{child.name} ({child.busRoute})</span>
-                      <span>${child.fee.toFixed(2)}</span>
+                      <span>Rs.{child.fee.toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -176,7 +176,7 @@ function PaymentForm() {
                 <div className="border-t border-gray-200 pt-4 mb-4">
                   <div className="flex justify-between font-semibold">
                     <span>Total Amount:</span>
-                    <span>${paymentDetails.amount.toFixed(2)}</span>
+                    <span>Rs.{paymentDetails.amount.toFixed(2)}</span>
                   </div>
                 </div>
                 
@@ -302,7 +302,7 @@ function PaymentForm() {
                             </svg>
                             Processing Payment...
                           </>
-                        ) : `Pay $${paymentDetails.amount.toFixed(2)}`}
+                        ) : `Pay Rs.${paymentDetails.amount.toFixed(2)}`}
                       </button>
                     </div>
                   </form>

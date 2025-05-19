@@ -122,54 +122,70 @@ export async function processCardPayment(req, res) {
       currency: 'usd',
       payment_method: paymentMethodId,
       confirm: true,
-      description: `Payment for Invoice ${invoice.invoiceId}`
+      description: `Payment for Invoice #${invoice._id}`, // Using invoice._id for clarity
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never', // Instruct Stripe not to redirect
+      },
     });
 
-    if (paymentIntent.status !== 'succeeded') {
-      return res.status(400).json({
+    if (paymentIntent.status === 'succeeded') {
+      // Update invoice status
+      invoice.status = 'paid';
+      invoice.paymentDate = new Date();
+      await invoice.save();
+
+      // Create payment record
+      const payment = await Payment.create({
+        amount,
+        paymentMethod: 'credit_card',
+        status: 'completed',
+        transactionId: paymentIntent.id,
+        description: `Payment for Invoice #${invoice._id}`, // Consistent description
+        parentId,
+        invoiceId: invoice._id, // Ensure this is the MongoDB ObjectId
+        childrenIds: invoice.childrenIds 
+      });
+
+      // Create receipt
+      const receipt = await Receipt.create({
+        invoiceId: invoice._id,
+        parentId,
+        amount,
+        paymentMethod: 'credit_card',
+        transactionId: paymentIntent.id,
+        paymentGateway: 'stripe',
+        paymentDate: new Date()
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment processed successfully',
+        receiptId: receipt._id
+      });
+    } else {
+      // If not 'succeeded' (e.g., 'requires_payment_method' because redirect was disallowed but needed, or other failure)
+      // The specific message from Stripe is often in last_payment_error
+      const errorMessage = paymentIntent.last_payment_error?.message || 'Payment processing failed or requires action not permitted.';
+      res.status(400).json({
         success: false,
-        message: 'Payment processing failed'
+        message: errorMessage
       });
     }
-
-    // Update invoice status
-    invoice.status = 'paid';
-    invoice.paymentDate = new Date();
-    await invoice.save();
-
-    // Create payment record
-    const payment = await Payment.create({
-      amount,
-      paymentMethod: 'credit_card',
-      status: 'completed',
-      transactionId: paymentIntent.id,
-      description: `Payment for Invoice ${invoice.invoiceNumber}`,
-      parentId,
-      invoiceId: invoice._id,
-      childrenIds: invoice.childrenIds // Assuming this is present in Invoice
-    });
-
-    // Create receipt
-    const receipt = await Receipt.create({
-      invoiceId: invoice._id,
-      parentId,
-      amount,
-      paymentMethod: 'credit_card',
-      transactionId: paymentIntent.id,
-      paymentGateway: 'stripe',
-      paymentDate: new Date()
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Payment processed successfully',
-      receiptId: receipt._id
-    });
   } catch (error) {
     console.error('Process card payment error:', error);
+    // Provide more specific Stripe error messages if available
+    let errorMessage = 'Payment processing failed';
+    if (error.type === 'StripeCardError') {
+      errorMessage = error.message;
+    } else if (error.type && error.message) { // Broader Stripe errors
+        errorMessage = error.message;
+    } else if (error.message) {
+        errorMessage = error.message;
+    }
     res.status(500).json({
       success: false,
-      message: error.message || 'Payment processing failed'
+      message: errorMessage
     });
   }
 }

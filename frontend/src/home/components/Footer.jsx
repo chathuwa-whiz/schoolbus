@@ -43,9 +43,9 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Product</h3>
             <ul className="space-y-2">
               <li><Link to="/features" className="text-indigo-200 hover:text-white transition-colors">Features</Link></li>
-              <li><Link to="/pricing" className="text-indigo-200 hover:text-white transition-colors">Pricing</Link></li>
+              {/* <li><Link to="/pricing" className="text-indigo-200 hover:text-white transition-colors">Pricing</Link></li>
               <li><Link to="/demo" className="text-indigo-200 hover:text-white transition-colors">Request Demo</Link></li>
-              <li><Link to="/guides" className="text-indigo-200 hover:text-white transition-colors">Guides</Link></li>
+              <li><Link to="/guides" className="text-indigo-200 hover:text-white transition-colors">Guides</Link></li> */}
             </ul>
           </div>
           
@@ -53,8 +53,8 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Company</h3>
             <ul className="space-y-2">
               <li><Link to="/about" className="text-indigo-200 hover:text-white transition-colors">About Us</Link></li>
-              <li><Link to="/blog" className="text-indigo-200 hover:text-white transition-colors">Blog</Link></li>
-              <li><Link to="/careers" className="text-indigo-200 hover:text-white transition-colors">Careers</Link></li>
+              {/* <li><Link to="/blog" className="text-indigo-200 hover:text-white transition-colors">Blog</Link></li>
+              <li><Link to="/careers" className="text-indigo-200 hover:text-white transition-colors">Careers</Link></li> */}
               <li><Link to="/contact" className="text-indigo-200 hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>
