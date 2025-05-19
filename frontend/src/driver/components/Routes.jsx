@@ -181,6 +181,135 @@ export default function Routes() {
     );
   }
 
+  // Adjust students display to handle multiple routes
+  const renderStudents = () => {
+    if (isStudentsLoading) {
+      return (
+        <div className="flex items-center justify-center h-32">
+          <Spinner />
+        </div>
+      );
+    }
+    
+    if (!filteredStudents || filteredStudents.length === 0) {
+      return (
+        <div className="col-span-full text-center py-8 text-gray-500">
+          No students found matching your search criteria.
+        </div>
+      );
+    }
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredStudents.map(student => (
+          <div key={student._id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 font-semibold">
+                {student.firstName?.[0] || ''}{student.lastName?.[0] || ''}
+              </div>
+              <div className="ml-3">
+                <h5 className="font-medium text-gray-800">{student.firstName} {student.lastName}</h5>
+                <p className="text-xs text-gray-500">Grade: {student.grade || 'N/A'}</p>
+              </div>
+            </div>
+            
+            <div className="text-sm">
+              <p className="mb-1">
+                <span className="text-gray-500">Address:</span> {getAddressForStudent(student)}
+              </p>
+              <p className="mb-1">
+                <span className="text-gray-500">Parent:</span> {student.parent?.firstName} {student.parent?.lastName}
+              </p>
+              
+              {/* Add assigned routes badges */}
+              {student.routes && student.routes.length > 0 && (
+                <div className="mt-2 mb-2">
+                  <span className="text-gray-500">Other routes:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {student.routes
+                      .filter(routeId => routeId !== expandedRoute) // Don't show current route
+                      .map(routeId => (
+                        <span key={routeId} className="inline-block px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-xs">
+                          {getRouteName(routeId)}
+                        </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex mt-2 pt-2 border-t border-gray-100">
+                {student.parent?.phone && (
+                  <a href={`tel:${student.parent.phone}`} className="flex items-center text-blue-600 text-xs mr-3">
+                    <HiPhone className="mr-1" /> Call
+                  </a>
+                )}
+                {student.parent?.email && (
+                  <a href={`mailto:${student.parent.email}`} className="flex items-center text-blue-600 text-xs">
+                    <HiMail className="mr-1" /> Email
+                  </a>
+                )}
+              </div>
+              
+              {student.medicalNotes && (
+                <div className="mt-2 p-2 bg-red-50 text-red-700 text-xs rounded">
+                  <div className="flex items-start">
+                    <HiExclamation className="h-4 w-4 mr-1 mt-0.5 text-red-600" />
+                    <span>
+                      <strong>Medical:</strong> {student.medicalNotes}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Add special needs indicator */}
+              {student.specialNeeds?.has && (
+                <div className="mt-2 p-2 bg-yellow-50 text-yellow-700 text-xs rounded">
+                  <div className="flex items-start">
+                    <HiExclamation className="h-4 w-4 mr-1 mt-0.5 text-yellow-600" />
+                    <span>
+                      <strong>Special needs:</strong> {student.specialNeeds.details}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Helper function to get appropriate address based on route type
+  const getAddressForStudent = (student) => {
+    if (activeTab === 'morning') {
+      // For morning routes, show pickup address
+      return formatAddress(student.pickupAddress);
+    } else {
+      // For afternoon routes, show dropoff address
+      return formatAddress(student.dropoffAddress);
+    }
+  };
+
+  // Helper function to format address object
+  const formatAddress = (address) => {
+    if (!address) return 'No address';
+    
+    const parts = [];
+    if (address.street) parts.push(address.street);
+    if (address.city) parts.push(address.city);
+    if (address.state) parts.push(address.state);
+    if (address.zipCode) parts.push(address.zipCode);
+    
+    return parts.length > 0 ? parts.join(', ') : 'No address';
+  };
+
+  // Helper function to get route name by ID
+  const getRouteName = (routeId) => {
+    if (!routesData?.data) return 'Unknown route';
+    const route = routesData.data.find(r => r._id === routeId);
+    return route ? route.name || `Route #${route.routeNumber}` : 'Unknown route';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
@@ -402,66 +531,7 @@ export default function Routes() {
                               </div>
                             </div>
                             
-                            {isStudentsLoading ? (
-                              <div className="flex items-center justify-center h-32">
-                                <Spinner />
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredStudents.length > 0 ? (
-                                  filteredStudents.map(student => (
-                                    <div key={student._id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                      <div className="flex items-center mb-3">
-                                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 font-semibold">
-                                          {student.firstName?.[0] || ''}{student.lastName?.[0] || ''}
-                                        </div>
-                                        <div className="ml-3">
-                                          <h5 className="font-medium text-gray-800">{student.firstName} {student.lastName}</h5>
-                                          <p className="text-xs text-gray-500">Grade: {student.grade || 'N/A'}</p>
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="text-sm">
-                                        <p className="mb-1">
-                                          <span className="text-gray-500">Address:</span> {student.address || 'No address'}
-                                        </p>
-                                        <p className="mb-1">
-                                          <span className="text-gray-500">Parent:</span> {student.parent?.firstName} {student.parent?.lastName}
-                                        </p>
-                                        
-                                        <div className="flex mt-2 pt-2 border-t border-gray-100">
-                                          {student.parent?.phone && (
-                                            <a href={`tel:${student.parent.phone}`} className="flex items-center text-blue-600 text-xs mr-3">
-                                              <HiPhone className="mr-1" /> Call
-                                            </a>
-                                          )}
-                                          {student.parent?.email && (
-                                            <a href={`mailto:${student.parent.email}`} className="flex items-center text-blue-600 text-xs">
-                                              <HiMail className="mr-1" /> Email
-                                            </a>
-                                          )}
-                                        </div>
-                                        
-                                        {student.medicalNotes && (
-                                          <div className="mt-2 p-2 bg-red-50 text-red-700 text-xs rounded">
-                                            <div className="flex items-start">
-                                              <HiExclamation className="h-4 w-4 mr-1 mt-0.5 text-red-600" />
-                                              <span>
-                                                <strong>Medical:</strong> {student.medicalNotes}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="col-span-full text-center py-8 text-gray-500">
-                                    No students found matching your search criteria.
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                            {renderStudents()}
                           </div>
                         </>
                       )}

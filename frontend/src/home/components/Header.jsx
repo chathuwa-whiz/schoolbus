@@ -24,9 +24,9 @@ export default function Header() {
             <Link to="/features" className="text-gray-600 hover:text-indigo-700 transition-colors">
               Features
             </Link>
-            <Link to="/pricing" className="text-gray-600 hover:text-indigo-700 transition-colors">
+            {/* <Link to="/pricing" className="text-gray-600 hover:text-indigo-700 transition-colors">
               Pricing
-            </Link>
+            </Link> */}
             <Link to="/contact" className="text-gray-600 hover:text-indigo-700 transition-colors">
               Contact
             </Link>
@@ -61,9 +61,9 @@ export default function Header() {
             <Link to="/features" className="block py-2 px-4 rounded hover:bg-gray-100 text-gray-700">
               Features
             </Link>
-            <Link to="/pricing" className="block py-2 px-4 rounded hover:bg-gray-100 text-gray-700">
+            {/* <Link to="/pricing" className="block py-2 px-4 rounded hover:bg-gray-100 text-gray-700">
               Pricing
-            </Link>
+            </Link> */}
             <Link to="/contact" className="block py-2 px-4 rounded hover:bg-gray-100 text-gray-700">
               Contact
             </Link>
