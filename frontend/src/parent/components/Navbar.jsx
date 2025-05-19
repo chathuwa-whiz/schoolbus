@@ -137,7 +137,7 @@ export default function Navbar({ toggleSidebar }) {
                 )}
                 
                 <Link 
-                  to="/parent/dashboard/notifications" 
+                  to="notifications" 
                   className="block text-center text-sm text-indigo-600 font-medium py-2 hover:bg-gray-50"
                   onClick={() => setShowNotifications(false)}
                 >
@@ -165,14 +165,14 @@ export default function Navbar({ toggleSidebar }) {
             {showDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-2 z-30">
                 <Link 
-                  to="/parent/dashboard/settings" 
+                  to="settings" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   onClick={() => setShowDropdown(false)}
                 >
                   Profile Settings
                 </Link>
                 <Link 
-                  to="/parent/dashboard/children" 
+                  to="children" 
                   className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   onClick={() => setShowDropdown(false)}
                 >
