@@ -4,9 +4,9 @@ import { toast } from 'react-hot-toast';
 import { HiCheck, HiOutlineClock, HiOutlineExclamationCircle, HiPlus } from 'react-icons/hi2';
 import { HiDownload, HiDocumentText } from 'react-icons/hi';
 import { 
-  useGetDriverSalaryQuery,
-  useGetDriverPaymentsQuery, 
-  useGetRouteIncomeQuery,
+  // useGetDriverSalaryQuery,
+  // useGetDriverPaymentsQuery, 
+  // useGetRouteIncomeQuery,
   useGetParentPaymentStatusQuery,
   useGetDriverRouteChildrenQuery,
   useGenerateInvoiceMutation
@@ -14,8 +14,8 @@ import {
 import Spinner from './Spinner';
 
 export default function Payments() {
-  const [activeTab, setActiveTab] = useState('summary');
-  const [selectedMonth, setSelectedMonth] = useState('August 2023');
+  const [activeTab, setActiveTab] = useState('parentPayments');
+  // const [selectedMonth, setSelectedMonth] = useState('August 2023');
   
   // Invoice generation state
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -28,9 +28,9 @@ export default function Payments() {
   });
 
   // RTK Query hooks
-  const { data: salaryData, isLoading: salaryLoading } = useGetDriverSalaryQuery(selectedMonth);
-  const { data: paymentsHistory, isLoading: paymentsLoading } = useGetDriverPaymentsQuery();
-  const { data: routeIncomeData, isLoading: routeIncomeLoading } = useGetRouteIncomeQuery(selectedMonth);
+  // const { data: salaryData, isLoading: salaryLoading } = useGetDriverSalaryQuery(selectedMonth);
+  // const { data: paymentsHistory, isLoading: paymentsLoading } = useGetDriverPaymentsQuery();
+  // const { data: routeIncomeData, isLoading: routeIncomeLoading } = useGetRouteIncomeQuery(selectedMonth);
   const { data: parentPaymentsData, isLoading: parentPaymentsLoading } = useGetParentPaymentStatusQuery();
   const { data: routeChildrenData, isLoading: routeChildrenLoading } = useGetDriverRouteChildrenQuery();
   
@@ -157,7 +157,7 @@ export default function Payments() {
         <h1 className="text-2xl font-bold text-gray-800">Payments</h1>
         
         <div className="flex items-center gap-3">
-          <select
+          {/* <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
@@ -167,7 +167,7 @@ export default function Payments() {
             <option value="June 2023">June 2023</option>
             <option value="May 2023">May 2023</option>
             <option value="April 2023">April 2023</option>
-          </select>
+          </select> */}
           
           <button
             onClick={() => setShowInvoiceModal(true)}
@@ -181,7 +181,7 @@ export default function Payments() {
       {/* Tab Navigation */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="flex border-b border-gray-200 flex-wrap">
-          <button
+          {/* <button
             onClick={() => setActiveTab('summary')}
             className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
               activeTab === 'summary'
@@ -190,8 +190,8 @@ export default function Payments() {
             }`}
           >
             Salary Summary
-          </button>
-          <button
+          </button> */}
+          {/* <button
             onClick={() => setActiveTab('history')}
             className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
               activeTab === 'history'
@@ -200,8 +200,8 @@ export default function Payments() {
             }`}
           >
             Payment History
-          </button>
-          <button
+          </button> */}
+          {/* <button
             onClick={() => setActiveTab('routeIncome')}
             className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
               activeTab === 'routeIncome'
@@ -210,7 +210,7 @@ export default function Payments() {
             }`}
           >
             Route Income
-          </button>
+          </button> */}
           <button
             onClick={() => setActiveTab('parentPayments')}
             className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-colors ${
@@ -235,7 +235,7 @@ export default function Payments() {
 
         <div className="p-5">
           {/* Salary Summary Tab */}
-          {activeTab === 'summary' && (
+          {/* {activeTab === 'summary' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -320,10 +320,10 @@ export default function Payments() {
                 </div>
               )}
             </motion.div>
-          )}
+          )} */}
 
           {/* Payment History Tab */}
-          {activeTab === 'history' && (
+          {/* {activeTab === 'history' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -370,10 +370,10 @@ export default function Payments() {
                 </div>
               )}
             </motion.div>
-          )}
+          )} */}
 
           {/* Route Income Tab */}
-          {activeTab === 'routeIncome' && (
+          {/* {activeTab === 'routeIncome' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -447,7 +447,7 @@ export default function Payments() {
                 </div>
               )}
             </motion.div>
-          )}
+          )} */}
 
           {/* Parent Payments Tab */}
           {activeTab === 'parentPayments' && (

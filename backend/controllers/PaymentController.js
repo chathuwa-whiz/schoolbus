@@ -276,38 +276,232 @@ export async function capturePaypalOrder(req, res) {
   }
 }
 
+// Get parent payment status
+export async function getParentPaymentStatus(req, res) {
+  try {
+    const driverId = req.user._id;
+
+    // Get routes assigned to this driver
+    const driverRoutes = await Route.find({ driver: driverId }).select('_id name');
+    if (!driverRoutes.length) {
+      return res.status(200).json({
+        success: true,
+        total: 0,
+        paid: 0,
+        pending: 0,
+        overdue: 0,
+        recentActivity: []
+      });
+    }
+    
+    const routeIds = driverRoutes.map(route => route._id);
+
+    // Find all children on these routes
+    const childrenOnRoutes = await Child.find({ 
+      $or: [
+        { routes: { $in: routeIds } },
+        { route: { $in: routeIds } }
+      ]
+    })
+    .populate('parent', 'firstName lastName')
+    .select('_id firstName lastName parent');
+
+    // Track found children IDs
+    const childIdsOnRoutes = childrenOnRoutes.map(c => c._id.toString());
+
+    console.log(`Found ${childIdsOnRoutes.length} children on driver's routes`);
+    
+    // Get all invoices (not limited to children yet)
+    // We'll filter later to check which ones are for children on driver's routes
+    const allInvoices = await Invoice.find()
+      .sort({ issueDate: -1 })
+      .limit(50)  // Get more invoices to ensure we have enough after filtering
+      .populate('parentId', 'firstName lastName')
+      .populate({
+        path: 'childrenIds',
+        select: 'firstName lastName',
+        model: 'Child'
+      });
+    
+    console.log(`Found ${allInvoices.length} total invoices`);
+
+    // Filter invoices to only those that contain children on driver's routes
+    const relevantInvoices = allInvoices.filter(invoice => {
+      // Check if any child ID in this invoice is also in our childIdsOnRoutes
+      return invoice.childrenIds.some(child => 
+        // Compare as strings to avoid object reference issues
+        childIdsOnRoutes.includes(child._id.toString())
+      );
+    });
+    
+    console.log(`Found ${relevantInvoices.length} invoices relevant to driver's routes`);
+
+    // Count payment statuses
+    let paidCount = 0;
+    let pendingCount = 0;
+    let overdueCount = 0;
+
+    // Count each status
+    relevantInvoices.forEach(invoice => {
+      if (invoice.status === 'paid') paidCount++;
+      else if (invoice.status === 'pending') pendingCount++;
+      else if (invoice.status === 'overdue') overdueCount++;
+    });
+
+    // Format recent payment activity
+    const recentActivity = [];
+    
+    for (const invoice of relevantInvoices) {
+      // For each child on this invoice
+      for (const child of invoice.childrenIds) {
+        // Check if this child is on driver's routes
+        if (childIdsOnRoutes.includes(child._id.toString())) {
+          // Find the specific item amount for this child, or approximate
+          let childAmount = 0;
+          
+          if (invoice.items && invoice.items.length > 0) {
+            // Try to find a matching line item
+            const itemForChild = invoice.items.find(
+              item => item.description.includes(child.firstName) ||
+                    item.description.toLowerCase().includes('transportation')
+            );
+            
+            childAmount = itemForChild 
+              ? itemForChild.amount 
+              : (invoice.amount / invoice.childrenIds.length);
+          } else {
+            // If no line items, divide total by number of children
+            childAmount = invoice.amount / invoice.childrenIds.length;
+          }
+
+          recentActivity.push({
+            parent: invoice.parentId 
+              ? `${invoice.parentId.firstName} ${invoice.parentId.lastName}` 
+              : 'Unknown Parent',
+            student: `${child.firstName} ${child.lastName}`,
+            date: invoice.issueDate 
+              ? new Date(invoice.issueDate).toLocaleDateString() 
+              : 'Unknown Date',
+            amount: parseFloat(childAmount.toFixed(2)),
+            status: invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)
+          });
+        }
+      }
+    }
+
+    // Limit recent activity to 5 entries and sort by date
+    const finalActivity = recentActivity
+      .slice(0, 5)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.status(200).json({
+      success: true,
+      total: childrenOnRoutes.length,
+      paid: paidCount,
+      pending: pendingCount,
+      overdue: overdueCount,
+      recentActivity: finalActivity
+    });
+  } catch (error) {
+    console.error('Get parent payment status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+}
+
 // Get driver salary data
 export async function getDriverSalary(req, res) {
   try {
     const driverId = req.user._id;
     const { month } = req.query;
     
-    // Here you'd query your database for the driver's salary information
-    // For demonstration, returning mock data
+    // Get driver's information including salary details
+    const driver = await User.findById(driverId).select('salary paymentDetails');
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Driver not found'
+      });
+    }
+    
+    // Get payment history for the driver for this month
+    const [year, monthNum] = month ? month.split(' ') : [new Date().getFullYear(), new Date().toLocaleString('default', { month: 'long' })];
+    const monthIndex = new Date(`${monthNum} 1, ${year}`).getMonth();
+    
+    const startDate = new Date(parseInt(year), monthIndex, 1);
+    const endDate = new Date(parseInt(year), monthIndex + 1, 0);
+    
+    // Calculate upcoming payment date
+    const nextPaymentDate = new Date(parseInt(year), monthIndex, 28);
+    if (nextPaymentDate < new Date()) {
+      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+    }
+    
+    // Get all payments for this driver in the period
+    const payments = await Payment.find({
+      driverId,
+      paymentDate: { $gte: startDate, $lte: endDate }
+    }).sort({ paymentDate: -1 });
+    
+    // Get all route data to calculate income
+    const routes = await Route.find({ driver: driverId });
+    const routeIds = routes.map(route => route._id);
+    
+    // Count students on routes to calculate income
+    const studentCount = await Child.countDocuments({ 
+      $or: [
+        { routes: { $in: routeIds } },
+        { route: { $in: routeIds } }
+      ]
+    });
+    
+    // Base calculation of gross amount - can be customized based on your business model
+    const ratePerStudent = 45; // This could come from a settings collection
+    const routeIncome = studentCount * ratePerStudent;
+    
+    // Calculate deductions - this would come from your business rules
+    const taxRate = 0.15; // Example tax rate
+    const insuranceRate = 0.06; // Example insurance rate
+    const retirementRate = 0.075; // Example retirement contribution rate
+    
+    const incomeTax = routeIncome * taxRate;
+    const insurance = routeIncome * insuranceRate;
+    const retirement = routeIncome * retirementRate;
+    const totalDeductions = incomeTax + insurance + retirement;
+    
+    // Find bonuses from payments
+    const bonuses = payments
+      .filter(payment => payment.metadata && payment.metadata.get('type') === 'bonus')
+      .map(payment => ({
+        description: payment.description || 'Performance Bonus',
+        amount: payment.amount,
+        date: payment.paymentDate.toLocaleDateString()
+      }));
     
     res.status(200).json({
       success: true,
-      grossAmount: 2800.00,
-      netAmount: 2140.00,
-      nextPaymentDate: 'August 31, 2023',
-      paymentMethod: 'Direct Deposit',
-      accountEnding: '****6789',
+      grossAmount: routeIncome,
+      netAmount: routeIncome - totalDeductions,
+      nextPaymentDate: nextPaymentDate.toLocaleDateString(),
+      paymentMethod: driver.paymentDetails?.method || 'Direct Deposit',
+      accountEnding: driver.paymentDetails?.accountNumber 
+        ? `****${driver.paymentDetails.accountNumber.slice(-4)}` 
+        : '****0000',
       deductions: {
-        incomeTax: 420.00,
-        insurance: 180.00,
-        retirement: 210.00
+        incomeTax,
+        insurance,
+        retirement
       },
-      totalDeductions: 810.00,
-      bonuses: [
-        { description: 'Perfect Attendance Bonus', amount: 150.00, date: 'July 31, 2023' },
-        { description: 'Safety Record Bonus', amount: 100.00, date: 'June 30, 2023' }
-      ]
+      totalDeductions,
+      bonuses
     });
   } catch (error) {
     console.error('Get driver salary error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error: ' + error.message
     });
   }
 }
@@ -316,22 +510,40 @@ export async function getDriverSalary(req, res) {
 export async function getDriverPaymentHistory(req, res) {
   try {
     const driverId = req.user._id;
+    
+    // Get all payments for this driver
+    const paymentRecords = await Payment.find({
+      driverId
+    }).sort({ paymentDate: -1 }).limit(12); // Get last 12 payments
+    
+    const payments = paymentRecords.map(payment => {
+      // Extract month and year for the period
+      const payDate = new Date(payment.paymentDate);
+      const period = `${payDate.toLocaleString('default', { month: 'long' })} ${payDate.getFullYear()}`;
+      
+      // Calculate gross and net from payment record
+      // This would depend on your payment structure
+      const grossAmount = payment.amount + (payment.taxes || 0);
+      
+      return {
+        id: payment._id,
+        period,
+        payDate: payDate.toLocaleDateString(),
+        grossAmount,
+        netAmount: payment.amount,
+        status: payment.status === 'completed' ? 'Paid' : payment.status
+      };
+    });
 
-    // For demonstration, returning mock data
     res.status(200).json({
       success: true,
-      payments: [
-        { id: 1, period: 'July 2023', payDate: 'July 31, 2023', grossAmount: 2800.00, netAmount: 2140.00, status: 'Paid' },
-        { id: 2, period: 'June 2023', payDate: 'June 30, 2023', grossAmount: 2800.00, netAmount: 2140.00, status: 'Paid' },
-        { id: 3, period: 'May 2023', payDate: 'May 31, 2023', grossAmount: 2800.00, netAmount: 2140.00, status: 'Paid' },
-        { id: 4, period: 'April 2023', payDate: 'April 30, 2023', grossAmount: 2650.00, netAmount: 2026.00, status: 'Paid' }
-      ]
+      payments
     });
   } catch (error) {
     console.error('Get driver payment history error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error: ' + error.message
     });
   }
 }
@@ -341,53 +553,61 @@ export async function getRouteIncome(req, res) {
   try {
     const driverId = req.user._id;
     const { month } = req.query;
+    
+    // Get all routes for this driver
+    const routes = await Route.find({ driver: driverId });
+    if (!routes.length) {
+      return res.status(200).json({
+        success: true,
+        totalStudents: 0,
+        ratePerStudent: 0,
+        totalIncome: 0,
+        routes: [],
+        notes: 'No active routes found'
+      });
+    }
+    
+    const routeIds = routes.map(route => route._id);
+    
+    // Get student count per route
+    const routeDetails = await Promise.all(routes.map(async route => {
+      const studentCount = await Child.countDocuments({
+        $or: [
+          { routes: route._id },
+          { route: route._id }
+        ]
+      });
+      
+      // Calculate income for this route
+      const ratePerStudent = 45; // This could come from settings
+      const total = studentCount * ratePerStudent;
+      
+      return {
+        name: route.name || `Route #${route.routeNumber}`,
+        students: studentCount,
+        ratePerStudent,
+        total
+      };
+    }));
+    
+    // Calculate totals across all routes
+    const totalStudents = routeDetails.reduce((sum, route) => sum + route.students, 0);
+    const totalIncome = routeDetails.reduce((sum, route) => sum + route.total, 0);
+    const ratePerStudent = totalStudents > 0 ? (totalIncome / totalStudents).toFixed(2) : 0;
 
-    // For demonstration, returning mock data
     res.status(200).json({
       success: true,
-      totalStudents: 14,
-      ratePerStudent: 45.00,
-      totalIncome: 630.00,
-      routes: [
-        { name: 'Northeast District Route', students: 7, ratePerStudent: 45.00, total: 315.00 },
-        { name: 'Northwest District Route', students: 7, ratePerStudent: 45.00, total: 315.00 }
-      ],
-      notes: 'Paid per student transported, calculated monthly'
+      totalStudents,
+      ratePerStudent,
+      totalIncome,
+      routes: routeDetails,
+      notes: 'Income calculated based on the number of students assigned to each route'
     });
   } catch (error) {
     console.error('Get route income error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
-    });
-  }
-}
-
-// Get parent payment status
-export async function getParentPaymentStatus(req, res) {
-  try {
-    const driverId = req.user._id;
-
-    // For demonstration, returning mock data
-    res.status(200).json({
-      success: true,
-      total: 14,
-      paid: 12,
-      pending: 1,
-      overdue: 1,
-      recentActivity: [
-        { parent: 'Sarah Johnson', student: 'Alex Johnson', date: 'August 2, 2023', amount: 45.00, status: 'Paid' },
-        { parent: 'Robert Wilson', student: 'Emma Wilson', date: 'August 1, 2023', amount: 45.00, status: 'Paid' },
-        { parent: 'Miguel Garcia', student: 'Sophia Garcia', date: 'July 29, 2023', amount: 45.00, status: 'Paid' },
-        { parent: 'Jennifer Smith', student: 'Jacob Smith', date: 'July 15, 2023', amount: 45.00, status: 'Overdue' },
-        { parent: 'Ana Martinez', student: 'Ethan Martinez', date: 'August 5, 2023', amount: 45.00, status: 'Pending' }
-      ]
-    });
-  } catch (error) {
-    console.error('Get parent payment status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
+      message: 'Server error: ' + error.message
     });
   }
 }
@@ -410,9 +630,15 @@ export async function getDriverRouteChildren(req, res) {
     const routeIds = routes.map(route => route._id);
     
     // Find all children on these routes with their parent info
-    const children = await Child.find({ route: { $in: routeIds } })
-      .populate('parent', 'firstName lastName')
-      .populate('route', 'name');
+    // Changed from route to routes
+    const children = await Child.find({ 
+      $or: [
+        { routes: { $in: routeIds } },  // Look for children with any of these routes in their routes array
+        { route: { $in: routeIds } }    // Backward compatibility for any records using old schema
+      ]
+    })
+    .populate('parent', 'firstName lastName')
+    .populate('routes', 'name');  // Populate the routes array instead of route
     
     // Get recent invoice/payment data for each child
     const childrenWithPaymentInfo = await Promise.all(children.map(async child => {
@@ -421,6 +647,11 @@ export async function getDriverRouteChildren(req, res) {
         childrenIds: child._id
       }).sort({ createdAt: -1 });
       
+      // Find the first matching route from this driver's routes (for display purposes)
+      const firstRoute = child.routes && child.routes.length > 0 
+        ? child.routes.find(r => routeIds.includes(r._id.toString())) 
+        : null;
+
       return {
         _id: child._id,
         firstName: child.firstName,
@@ -428,8 +659,11 @@ export async function getDriverRouteChildren(req, res) {
         grade: child.grade,
         parentName: child.parent ? `${child.parent.firstName} ${child.parent.lastName}` : null,
         parentId: child.parent?._id,
-        routeName: child.route?.name,
-        routeId: child.route?._id,
+        // Use the first matching route for display
+        routeName: firstRoute?.name || 'Unknown Route',
+        routeId: firstRoute?._id || null,
+        // Include all route IDs for reference
+        routeIds: child.routes ? child.routes.map(r => r._id) : [],
         lastInvoice: recentInvoice ? {
           id: recentInvoice._id,
           amount: recentInvoice.amount,
@@ -493,7 +727,7 @@ export async function generateInvoice(req, res) {
     
     const eligibleChildren = await Child.find({
       _id: { $in: childrenIds },
-      route: { $in: routeIds }
+      routes: { $in: routeIds }
     }).populate('parent');
     
     if (!eligibleChildren.length) {
