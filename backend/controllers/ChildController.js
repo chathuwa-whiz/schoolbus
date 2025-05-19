@@ -91,8 +91,11 @@ export async function createChild(req, res) {
     };
 
     // Only add route if it's provided and not null
-    if (route) {
-      childData.route = route;
+    if (req.body.routes && Array.isArray(req.body.routes)) {
+      childData.routes = req.body.routes;
+    } else if (req.body.route) {
+      // For backward compatibility
+      childData.routes = [req.body.route];
     }
 
     // Create the child
@@ -298,7 +301,7 @@ export async function getRouteChildren(req, res) {
     }
     
     // Get all children assigned to this route
-    const children = await Child.find({ route: routeId })
+    const children = await Child.find({ routes: routeId })
       .populate('parent', 'firstName lastName email phone')
       .sort({ firstName: 1, lastName: 1 });
     

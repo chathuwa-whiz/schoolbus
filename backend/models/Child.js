@@ -36,10 +36,10 @@ const childSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'Parent/guardian is required']
     },
-    route: {
+    routes: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Route'
-    },
+    }],
     pickupAddress: {
       street: String,
       city: String,

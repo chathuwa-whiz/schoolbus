@@ -8,15 +8,19 @@ import {
   useUpdateChildMutation 
 } from '../../redux/features/childSlice';
 import { useGetActiveRoutesQuery } from '../../redux/features/routeSlice';
-import { HiPlus, HiPencil, HiTrash, HiX } from 'react-icons/hi';
+import { HiPlus, HiPencil, HiTrash, HiX, HiChevronDown } from 'react-icons/hi';
+import { FaBus } from "react-icons/fa";
 
 export default function Children() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentChildId, setCurrentChildId] = useState(null);
+  const [routeModalOpen, setRouteModalOpen] = useState(false);
+  const [activeChildForRoutes, setActiveChildForRoutes] = useState(null);
+  const [isUpdatingRoutes, setIsUpdatingRoutes] = useState(false);
   
   // API queries
-  const { data: childrenData, isLoading, isError } = useGetChildrenQuery();
+  const { data: childrenData, isLoading, isError, refetch } = useGetChildrenQuery();
   const { data: routesData, isLoading: isLoadingRoutes } = useGetActiveRoutesQuery();
   const [createChild, { isLoading: isCreating }] = useCreateChildMutation();
   const [updateChild, { isLoading: isUpdating }] = useUpdateChildMutation();
@@ -41,7 +45,7 @@ export default function Children() {
       state: '',
       zipCode: ''
     },
-    route: '', 
+    routes: [], // Changed from single route to routes array
     specialNeeds: {
       has: false,
       details: ''
@@ -75,7 +79,7 @@ export default function Children() {
         state: '',
         zipCode: ''
       },
-      route: '',
+      routes: [],
       specialNeeds: {
         has: false,
         details: ''
@@ -106,6 +110,29 @@ export default function Children() {
     }
   };
   
+  const handleRouteSelect = (e) => {
+    const routeId = e.target.value;
+    if (!routeId) return;
+    
+    // Add route if it's not already in the array
+    if (!newChild.routes.includes(routeId)) {
+      setNewChild(prev => ({
+        ...prev,
+        routes: [...prev.routes, routeId]
+      }));
+    }
+    
+    // Reset the select input
+    e.target.value = '';
+  };
+  
+  const handleRemoveRoute = (routeId) => {
+    setNewChild(prev => ({
+      ...prev,
+      routes: prev.routes.filter(id => id !== routeId)
+    }));
+  };
+  
   const handleEdit = (child) => {
     // Fill the form with the selected child's data
     setNewChild({
@@ -127,7 +154,10 @@ export default function Children() {
         state: child.dropoffAddress?.state || '',
         zipCode: child.dropoffAddress?.zipCode || ''
       },
-      route: child.route || '',
+      // Handle existing routes - could be array or single value
+      routes: Array.isArray(child.routes) 
+        ? child.routes 
+        : (child.route ? [child.route] : []),
       specialNeeds: {
         has: child.specialNeeds?.has || false,
         details: child.specialNeeds?.details || ''
@@ -146,23 +176,16 @@ export default function Children() {
       // Create a copy of the child object to modify before submission
       const childToSubmit = { ...newChild };
       
-      // If no route is selected, set it to null instead of empty string
-      if (!childToSubmit.route) {
-        childToSubmit.route = null;
-      }
-      
       if (isEditMode) {
         await updateChild({
           id: currentChildId,
           ...childToSubmit
         }).unwrap();
         
-        // Show success message
         toast.success("Child updated successfully!");
       } else {
         await createChild(childToSubmit).unwrap();
         
-        // Show success message
         toast.success("Child added successfully!");
       }
       
@@ -186,6 +209,97 @@ export default function Children() {
       }
     }
   };
+  
+  // Open route management modal for a specific child with most current data
+  const openRouteModal = (child) => {
+    // Make a deep copy to avoid reference issues
+    setActiveChildForRoutes({...child});
+    setRouteModalOpen(true);
+  };
+  
+  // Update child's routes directly from the card
+  const updateChildRoutes = async (childId, routes) => {
+    setIsUpdatingRoutes(true);
+    try {
+      await updateChild({
+        id: childId,
+        routes
+      }).unwrap();
+      
+      // Force refetch children data to get updated routes
+      await refetch();
+      
+      toast.success("Bus routes updated successfully!");
+      
+    } catch (error) {
+      console.error("Failed to update bus routes:", error);
+      toast.error(error.data?.message || "Failed to update bus routes. Please try again.");
+    } finally {
+      setIsUpdatingRoutes(false);
+      setRouteModalOpen(false);
+      setActiveChildForRoutes(null);
+    }
+  };
+  
+  // Add a route to child from the card view modal
+  const addRouteToChild = (routeId) => {
+    if (!activeChildForRoutes || !routeId || routeId === "") return;
+    
+    const currentRoutes = Array.isArray(activeChildForRoutes.routes) 
+      ? [...activeChildForRoutes.routes] // Create a copy to avoid mutation 
+      : (activeChildForRoutes.route ? [activeChildForRoutes.route] : []);
+      
+    if (!currentRoutes.includes(routeId)) {
+      // Update local state first for immediate UI feedback
+      const updatedRoutes = [...currentRoutes, routeId];
+      setActiveChildForRoutes(prev => ({
+        ...prev,
+        routes: updatedRoutes,
+        // Remove single route property to avoid confusion
+        route: undefined
+      }));
+
+      console.log("Updated routes:", updatedRoutes);
+      
+      // Then update in database
+      updateChildRoutes(activeChildForRoutes._id, updatedRoutes);
+    } else {
+      toast.info("This route is already assigned to the child");
+    }
+    
+    // Reset the select input
+    document.querySelector('[aria-label="Add route"]').value = "";
+  };
+  
+  // Remove a route from child 
+  const removeRouteFromChild = (childId, routeId) => {
+    if (!childId || !routeId) return;
+    
+    // Find the active child if we're working with it
+    const child = activeChildForRoutes && activeChildForRoutes._id === childId 
+      ? activeChildForRoutes 
+      : childrenData?.data?.find(c => c._id === childId);
+      
+    if (!child) return;
+    
+    const currentRoutes = Array.isArray(child.routes) 
+      ? [...child.routes] // Create a copy
+      : (child.route ? [child.route] : []);
+      
+    const updatedRoutes = currentRoutes.filter(id => id !== routeId);
+    
+    // If we're in the modal, update the local state first
+    if (activeChildForRoutes && activeChildForRoutes._id === childId) {
+      setActiveChildForRoutes(prev => ({
+        ...prev,
+        routes: updatedRoutes,
+        route: undefined
+      }));
+    }
+    
+    // Then update in database
+    updateChildRoutes(childId, updatedRoutes);
+  };
 
   // Function to format date of birth for display
   const formatDateOfBirth = (dateOfBirth) => {
@@ -205,6 +319,13 @@ export default function Children() {
     }
     
     return age;
+  };
+  
+  // Get route name by ID for display
+  const getRouteName = (routeId) => {
+    if (!routesData?.data) return 'Loading...';
+    const route = routesData.data.find(r => r._id === routeId);
+    return route ? `${route.name} (${route.type === 'morning' ? 'Morning' : 'Afternoon'})` : 'Unknown route';
   };
 
   return (
@@ -381,17 +502,17 @@ export default function Children() {
                 </div>
               </div>
               
-              {/* Route Selection */}
-              <div>
-                <label htmlFor="route" className="block text-gray-700 text-sm font-medium mb-1">Bus Route (Optional)</label>
+              {/* Bus Routes - Modified to support multiple routes */}
+              <div className="col-span-2">
+                <label htmlFor="routes" className="block text-gray-700 text-sm font-medium mb-1">Bus Routes</label>
                 <select
-                  id="route"
-                  name="route"
-                  value={newChild.route}
-                  onChange={handleChange}
+                  id="routes"
+                  name="routes"
+                  onChange={handleRouteSelect}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                  defaultValue=""
                 >
-                  <option value="">-- Select a bus route --</option>
+                  <option value="">-- Select a bus route to add --</option>
                   {routesData?.data?.map(route => (
                     <option key={route._id} value={route._id}>
                       {route.name} ({route.type === 'morning' ? 'Morning' : 'Afternoon'} - {route.school})
@@ -399,6 +520,27 @@ export default function Children() {
                   ))}
                 </select>
                 {isLoadingRoutes && <p className="text-xs text-gray-500 mt-1">Loading routes...</p>}
+                
+                {/* Display selected routes with remove option */}
+                {newChild.routes.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Selected Routes:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {newChild.routes.map(routeId => (
+                        <div key={routeId} className="flex items-center bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-sm">
+                          <span>{getRouteName(routeId)}</span>
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveRoute(routeId)}
+                            className="ml-2 text-indigo-500 hover:text-indigo-700"
+                          >
+                            <HiX className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Special Needs Checkbox */}
@@ -458,6 +600,121 @@ export default function Children() {
         </motion.div>
       )}
       
+      {/* Route management modal */}
+      {routeModalOpen && activeChildForRoutes && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        >
+          <motion.div 
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            className="bg-white rounded-xl p-6 max-w-md w-full"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">
+                Manage Bus Routes - {activeChildForRoutes.firstName}
+              </h3>
+              <button 
+                onClick={() => {
+                  if (!isUpdatingRoutes) {
+                    setRouteModalOpen(false);
+                    setActiveChildForRoutes(null);
+                  }
+                }}
+                disabled={isUpdatingRoutes}
+                className={`text-gray-500 ${isUpdatingRoutes ? 'opacity-50 cursor-not-allowed' : 'hover:text-gray-700'}`}
+              >
+                <HiX className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-medium mb-2">Add Route</label>
+              <select
+                onChange={(e) => addRouteToChild(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                defaultValue=""
+                disabled={isUpdatingRoutes}
+                aria-label="Add route"
+              >
+                <option value="">-- Select a route to add --</option>
+                {routesData?.data?.map(route => {
+                  // Don't show routes that are already assigned
+                  const currentRoutes = Array.isArray(activeChildForRoutes.routes) 
+                    ? activeChildForRoutes.routes 
+                    : (activeChildForRoutes.route ? [activeChildForRoutes.route] : []);
+                
+                  if (currentRoutes.includes(route._id)) return null;
+                
+                  return (
+                    <option key={route._id} value={route._id}>
+                      {route.name} ({route.type === 'morning' ? 'Morning' : 'Afternoon'} - {route.school})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Current Routes</label>
+              {isUpdatingRoutes && (
+                <div className="flex justify-center items-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                  <p className="ml-2 text-sm text-gray-600">Updating routes...</p>
+                </div>
+              )}
+              
+              {!isUpdatingRoutes && Array.isArray(activeChildForRoutes.routes) && activeChildForRoutes.routes.length > 0 ? (
+                <div className="space-y-2">
+                  {activeChildForRoutes.routes.map(routeId => (
+                    <div key={routeId} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                      <span>{getRouteName(routeId)}</span>
+                      <button
+                        onClick={() => removeRouteFromChild(activeChildForRoutes._id, routeId)}
+                        className="text-red-500 hover:text-red-700"
+                        disabled={isUpdatingRoutes}
+                      >
+                        <HiTrash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : !isUpdatingRoutes && activeChildForRoutes.route ? (
+                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                  <span>{getRouteName(activeChildForRoutes.route)}</span>
+                  <button
+                    onClick={() => removeRouteFromChild(activeChildForRoutes._id, activeChildForRoutes.route)}
+                    className="text-red-500 hover:text-red-700"
+                    disabled={isUpdatingRoutes}
+                  >
+                    <HiTrash className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : !isUpdatingRoutes ? (
+                <p className="text-gray-500 italic">No routes assigned</p>
+              ) : null}
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => {
+                  if (!isUpdatingRoutes) {
+                    setRouteModalOpen(false);
+                    setActiveChildForRoutes(null);
+                  }
+                }}
+                disabled={isUpdatingRoutes}
+                className={`px-4 py-2 ${isUpdatingRoutes ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg transition-colors`}
+              >
+                {isUpdatingRoutes ? 'Processing...' : 'Done'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {!isLoading && childrenData?.data && childrenData.data.map(child => (
           <motion.div
@@ -496,6 +753,41 @@ export default function Children() {
                     {child.pickupAddress?.street} {child.pickupAddress?.city}, {child.pickupAddress?.state} {child.pickupAddress?.zipCode}
                   </p>
                 </div>
+                
+                {/* Bus Routes Section */}
+                <div className="bg-gray-50 p-3 rounded-lg col-span-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-gray-500">Bus Routes</p>
+                    <button
+                      onClick={() => openRouteModal(child)}
+                      className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center"
+                    >
+                      Manage Routes <HiChevronDown className="w-4 h-4 ml-1" />
+                    </button>
+                  </div>
+                  <div className="mt-1">
+                    {Array.isArray(child.routes) && child.routes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {child.routes.map(routeId => (
+                          <span key={routeId} className="inline-block px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs">
+                            <FaBus className="inline w-3 h-3 mr-1" />
+                            {getRouteName(routeId)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : child.route ? (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="inline-block px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs">
+                          <FaBus className="inline w-3 h-3 mr-1" />
+                          {getRouteName(child.route)}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-sm italic">No routes assigned</p>
+                    )}
+                  </div>
+                </div>
+                
                 <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">
                   <div>
                     <p className="text-gray-500">Actions</p>
