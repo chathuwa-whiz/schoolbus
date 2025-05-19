@@ -81,7 +81,7 @@ function PaymentForm() {
       }).unwrap();
       
       toast.success('Payment processed successfully!');
-      navigate('/parent/payments/receipt/' + result.receiptId);
+      // navigate('/parent/payments/receipt/' + result.receiptId);
     } catch (err) {
       toast.error('Payment failed: ' + (err.data?.message || 'Unknown error'));
     } finally {
