@@ -43,7 +43,7 @@ export const attendanceApi = createApi({
       query: ({ childId, data }) => ({
         url: `/child/${childId}/daily`,
         method: 'PUT',
-        body: data
+        body: data // Now includes date, morningPickup, and afternoonDropoff
       }),
       invalidatesTags: (result, error, { childId }) => [
         { type: 'ChildAttendance', id: childId }

@@ -168,7 +168,7 @@ export async function updateDailyAttendance(req, res) {
   try {
     const { childId } = req.params;
     const parentId = req.user._id;
-    const { morningPickup, afternoonDropoff } = req.body;
+    const { morningPickup, afternoonDropoff, date } = req.body;
     
     // Verify child belongs to parent
     const child = await Child.findOne({ 
@@ -183,19 +183,19 @@ export async function updateDailyAttendance(req, res) {
       });
     }
     
-    // Get today's date
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use provided date or default to today
+    const targetDate = date ? new Date(date) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
     
-    // Check if attendance record exists for today
-    let todayRecord = child.attendance.find(a => 
-      new Date(a.date).toISOString().split('T')[0] === today.toISOString().split('T')[0]
+    // Check if attendance record exists for the target date
+    let attendanceRecord = child.attendance.find(a => 
+      new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
     );
     
     // Create new record if doesn't exist
-    if (!todayRecord) {
+    if (!attendanceRecord) {
       child.attendance.push({
-        date: today,
+        date: targetDate,
         morningPickup: morningPickup !== undefined ? {
           status: morningPickup ? 'expected' : 'unavailable'
         } : undefined,
@@ -206,7 +206,7 @@ export async function updateDailyAttendance(req, res) {
     } else {
       // Update existing record
       const index = child.attendance.findIndex(a => 
-        new Date(a.date).toISOString().split('T')[0] === today.toISOString().split('T')[0]
+        new Date(a.date).toISOString().split('T')[0] === targetDate.toISOString().split('T')[0]
       );
       
       if (morningPickup !== undefined) {
@@ -230,6 +230,7 @@ export async function updateDailyAttendance(req, res) {
       success: true,
       message: `Attendance preferences updated for ${child.firstName}`,
       data: {
+        date: targetDate.toISOString().split('T')[0],
         morningPickup: morningPickup,
         afternoonDropoff: afternoonDropoff
       }

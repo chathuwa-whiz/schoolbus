@@ -43,6 +43,10 @@ export default function AttendanceHistory() {
   const [driverNote, setDriverNote] = useState('');
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   
+  // First, add a new state to track multiple days of attendance
+  const [multiDayAttendance, setMultiDayAttendance] = useState([]);
+  const [showMultiDayModal, setShowMultiDayModal] = useState(false);
+  
   // Extract month/year for API queries
   const getMonthYearParams = () => {
     const [month, year] = selectedMonth.split(' ');
@@ -278,6 +282,60 @@ export default function AttendanceHistory() {
     );
   };
 
+  // Function to generate the next 5 days (plus today)
+  const generateNextDays = () => {
+    const days = [];
+    for (let i = 0; i < 6; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() + i);
+      days.push({
+        date: date.toISOString().split('T')[0],
+        day: date.toLocaleDateString('en-US', { weekday: 'long' }),
+        displayDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        morningPickup: true,
+        afternoonDropoff: true
+      });
+    }
+    return days;
+  };
+
+  // Initialize the multi-day attendance when the modal is opened
+  const openMultiDayModal = () => {
+    setMultiDayAttendance(generateNextDays());
+    setShowMultiDayModal(true);
+  };
+
+  // Update attendance for a specific day
+  const handleMultiDayToggle = (index, type) => {
+    const updatedAttendance = [...multiDayAttendance];
+    updatedAttendance[index][type] = !updatedAttendance[index][type];
+    setMultiDayAttendance(updatedAttendance);
+  };
+
+  // Submit all attendance changes
+  const handleMultiDaySubmit = async () => {
+    const promises = multiDayAttendance.map(day => 
+      updateDailyAttendance({
+        childId: selectedChild._id,
+        data: {
+          date: day.date,
+          morningPickup: day.morningPickup,
+          afternoonDropoff: day.afternoonDropoff
+        }
+      }).unwrap()
+    );
+    
+    try {
+      await Promise.all(promises);
+      toast.success('Attendance updated for multiple days');
+      setShowMultiDayModal(false);
+      refetchToday();
+    } catch (error) {
+      toast.error('Failed to update attendance for all days. Please try again.');
+      console.error('Multi-day attendance update error:', error);
+    }
+  };
+
   return (
     <div className="space-y-6 md:pt-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -329,6 +387,21 @@ export default function AttendanceHistory() {
           >
             <HiDocumentText className="w-5 h-5 mr-2" />
             Report Absence/Late
+          </button>
+
+          {/* Add this near the "Report Absence/Late" button */}
+          <button 
+            onClick={() => {
+              if (!selectedChild) {
+                toast.error('Please select a child first');
+                return;
+              }
+              openMultiDayModal();
+            }}
+            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center"
+          >
+            <HiCalendar className="w-5 h-5 mr-2" />
+            Schedule Multiple Days
           </button>
         </div>
       </div>
@@ -719,66 +792,35 @@ export default function AttendanceHistory() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   >
-                    <option value="absent">Absent (Child will not come to school)</option>
-                    <option value="late">Late Arrival (Child will come late)</option>
+                    <option value="absent">Absent</option>
+                    <option value="late">Late Arrival</option>
                   </select>
                 </div>
                 
                 <div>
                   <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">
-                    Reason
+                    Reason (optional)
                   </label>
                   <textarea
                     id="reason"
                     value={reportData.reason}
                     onChange={e => setReportData({...reportData, reason: e.target.value})}
-                    rows="3"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Please provide a reason for absence/late arrival"
-                    required
+                    rows="3"
                   ></textarea>
                 </div>
                 
-                {reportData.status === 'absent' && (
-                  <div>
-                    <label htmlFor="returnDate" className="block text-sm font-medium text-gray-700 mb-1">
-                      Expected Return Date (Optional)
-                    </label>
-                    <input
-                      type="date"
-                      id="returnDate"
-                      value={reportData.returnDate}
-                      onChange={e => setReportData({...reportData, returnDate: e.target.value})}
-                      min={reportData.date}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                )}
-                
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm font-medium text-gray-700">Specify Time (if applicable)</p>
+                <div className="flex gap-4">
                   <div className="flex items-center">
-                    <input
-                      type="checkbox"
+                    <input 
+                      type="checkbox" 
                       id="morningOnly"
                       checked={reportData.morningOnly}
                       onChange={e => setReportData({...reportData, morningOnly: e.target.checked})}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <label htmlFor="morningOnly" className="ml-2 text-sm text-gray-700">
-                      Morning only (Child will not need morning pickup)
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="afternoonOnly"
-                      checked={reportData.afternoonOnly}
-                      onChange={e => setReportData({...reportData, afternoonOnly: e.target.checked})}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="afternoonOnly" className="ml-2 text-sm text-gray-700">
-                      Afternoon only (Child will not need afternoon dropoff)
+                      Morning only (Child will not need afternoon dropoff)
                     </label>
                   </div>
                 </div>
@@ -801,6 +843,108 @@ export default function AttendanceHistory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Day Attendance Modal */}
+      {showMultiDayModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+              Schedule Attendance for Multiple Days
+            </h3>
+            
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <HiInformationCircle className="inline-block mr-1 h-5 w-5" />
+                Set bus attendance for {selectedChild?.firstName} for today and the next 5 days.
+              </p>
+            </div>
+            
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {multiDayAttendance.map((day, index) => (
+                <div key={day.date} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-medium text-gray-800">{day.day}</h4>
+                      <p className="text-sm text-gray-500">{day.displayDate}</p>
+                    </div>
+                    {index === 0 && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        Today
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Morning Pickup */}
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="bg-amber-100 p-1 rounded-full mr-2">
+                            <TbBusStop className="text-amber-600 w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-medium">Morning Pickup</span>
+                        </div>
+                        <label className="inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={day.morningPickup}
+                            onChange={() => handleMultiDayToggle(index, 'morningPickup')}
+                          />
+                          <div className="relative w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {day.morningPickup ? 'Will need pickup' : 'No pickup needed'}
+                      </p>
+                    </div>
+                    
+                    {/* Afternoon Dropoff */}
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="bg-blue-100 p-1 rounded-full mr-2">
+                            <HiHome className="text-blue-600 w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-medium">Afternoon Dropoff</span>
+                        </div>
+                        <label className="inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={day.afternoonDropoff}
+                            onChange={() => handleMultiDayToggle(index, 'afternoonDropoff')}
+                          />
+                          <div className="relative w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {day.afternoonDropoff ? 'Will need dropoff' : 'No dropoff needed'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowMultiDayModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMultiDaySubmit}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+              >
+                Save All Attendance
+              </button>
+            </div>
           </div>
         </div>
       )}
