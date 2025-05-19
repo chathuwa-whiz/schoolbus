@@ -503,7 +503,7 @@ export default function Payments() {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{activity.parent}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{activity.student}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{activity.date}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">${activity.amount}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">Rs.{activity.amount}</td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {renderStatusBadge(activity.status)}
                               </td>
@@ -611,7 +611,7 @@ export default function Payments() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount (Rs)</label>
                 <input
                   type="number"
                   name="amount"
