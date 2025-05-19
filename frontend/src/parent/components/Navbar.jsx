@@ -81,8 +81,8 @@ export default function Navbar({ toggleSidebar }) {
           </button>
           
           <Link to="/parent/dashboard" className="flex items-center">
-            <img src="/logo.png" alt="BusTracker" className="h-8 w-auto mr-2" />
-            <span className="text-xl font-bold text-indigo-900 hidden md:inline-block">BusTracker</span>
+            <img src="/logo.png" alt="VANMATE" className="h-8 w-auto mr-2" />
+            <span className="text-xl font-bold text-indigo-900 hidden md:inline-block">VANMATE</span>
           </Link>
         </div>
         

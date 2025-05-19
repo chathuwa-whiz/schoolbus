@@ -42,7 +42,7 @@ export default function Navbar({ toggleSidebar }) {
               alt="Logo" 
               className="h-8 w-auto" 
             />
-            <span className="ml-2 text-xl font-bold text-amber-600 hidden md:block">BusTracker</span>
+            <span className="ml-2 text-xl font-bold text-amber-600 hidden md:block">VANMATE</span>
             <span className="ml-2 text-sm text-gray-500 hidden md:block">Driver Panel</span>
           </Link>
         </div>

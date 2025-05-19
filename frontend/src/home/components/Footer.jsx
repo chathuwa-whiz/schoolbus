@@ -14,7 +14,7 @@ export default function Footer() {
                 alt="School Bus Management" 
                 className="h-8 w-auto mr-2" 
               />
-              <span className="text-xl font-bold">BusTracker</span>
+              <span className="text-xl font-bold">VANMATE</span>
             </div>
             <p className="text-indigo-200 mb-4">
               Safe, efficient school bus management system with real-time tracking and powerful features.
@@ -70,7 +70,7 @@ export default function Footer() {
         </div>
         
         <div className="mt-12 pt-8 border-t border-indigo-800">
-          <p className="text-center text-indigo-200">© {new Date().getFullYear()} BusTracker. All rights reserved.</p>
+          <p className="text-center text-indigo-200">© {new Date().getFullYear()} VANMATE. All rights reserved.</p>
         </div>
       </div>
     </footer>
