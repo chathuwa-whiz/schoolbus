@@ -559,7 +559,7 @@ export default function Payments() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Child Name</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Grade</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Parent</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Route</th>
+                          {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Route</th> */}
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Last Invoice</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Payment Status</th>
                         </tr>
@@ -576,9 +576,9 @@ export default function Payments() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                               {child.parentName || 'N/A'}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                            {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                               {child.routeName || 'N/A'}
-                            </td>
+                            </td> */}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                               {child.lastInvoice?.date ? new Date(child.lastInvoice.date).toLocaleDateString() : 'None'}
                             </td>

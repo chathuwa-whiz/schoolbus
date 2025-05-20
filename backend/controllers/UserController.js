@@ -103,6 +103,8 @@ export async function register(req, res) {
       password,
       phone,
       role,
+      department,
+      schoolName,
       isActive: true
     };
 
@@ -124,7 +126,7 @@ export async function register(req, res) {
         message: 'License number is required for drivers'
       });
     }
-
+{/*
     if (role === 'admin' && schoolName && department) {
       userData.schoolName = schoolName;
       userData.department = department;
@@ -134,7 +136,7 @@ export async function register(req, res) {
         message: 'School name and department are required for administrators'
       });
     }
-
+*/}
     const user = await User.create(userData);
 
     // Generate tokens

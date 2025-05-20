@@ -81,11 +81,9 @@ const userSchema = new mongoose.Schema(
     }],
     
     // Admin-specific fields
+    
     schoolName: {
       type: String,
-      required: function() {
-        return this.role === 'admin';
-      }
     },
     department: {
       type: String,
